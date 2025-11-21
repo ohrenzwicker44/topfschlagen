@@ -1,12 +1,16 @@
-<p id="coords">Position wird hier angezeigt</p>
-<button onclick="getLocation()">Position holen</button>
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>GPS Test</title>
+</head>
+<body>
+    <h1>GPS Testseite</h1>
 
-<script>
-function getLocation() {
-    navigator.geolocation.getCurrentPosition(position => {
-        document.getElementById("coords").innerText =
-            "Lat: " + position.coords.latitude +
-            " | Lon: " + position.coords.longitude;
-    });
-}
-</script>
+    <!-- Button, der die Position holt -->
+    <button onclick="getLocation()">Position holen</button>
+
+    <!-- JS Datei einbinden -->
+    <script src="script.js"></script>
+</body>
+</html>
