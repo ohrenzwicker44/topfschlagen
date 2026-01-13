@@ -310,8 +310,8 @@ function stopLoop() {
 
 function scheduleNext(time) {
   // Je näher, desto schneller (bis 10m). Unter 10m Dauerton oder sehr schnell.
-  let distClamped = constrain(distanceMeters, 1, 150);
-  let interval = map(distClamped, 0, 150, 0.1, 1.5);
+  let distClamped = constrain(distanceMeters, 1, 30);
+  let interval = map(distClamped, 0, 30, 0.1, 1.5);
 
   eventId = Tone.Transport.scheduleOnce((t) => {
     if (!player) return;
