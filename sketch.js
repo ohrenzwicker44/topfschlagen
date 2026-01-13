@@ -162,58 +162,84 @@ function handleOrientation(event) {
 // =======================
 
 function draw() {
-  // 1. Hintergrund-Logik (Farbverlauf)
+  // Dynamische Schriftgröße basierend auf der Bildschirmbreite
+  let baseSize = min(width, height);
+  
+  // 1. Hintergrund-Logik (Farbverlauf wie gehabt)
   if (gameActive && !hasWon) {
     checkWinCondition();
-    
-    // Berechne Farbe: Standard Grau/Rot -> Grün je mehr Zeit im Ziel
     let progress = constrain(timeInZone / zoneDuration, 0, 1);
-    // Von Hellgrau (240) zu Sattem Grün (0, 255, 0)
-    let bgColor = lerpColor(color(240, 240, 240), color(100, 255, 100), progress);
+    let bgColor = lerpColor(color(240), color(100, 255, 100), progress);
     background(bgColor);
-    
   } else if (hasWon) {
-    background(0, 255, 0); // Sieg = Komplett Grün
+    background(0, 255, 0);
   } else {
-    background(200); // Warten auf Start
+    background(200);
   }
 
-  // 2. Text Informationen
   fill(0);
   noStroke();
   
   if (!hasGPS) {
+    textSize(baseSize * 0.05);
     text("Warte auf GPS Signal...", width/2, height/2);
     return;
   }
 
   if (hasWon) {
-    textSize(32);
-    text("ZIEL ERREICHT!", width/2, height/2 - 50);
-    textSize(18);
+    textSize(baseSize * 0.1);
+    text("ZIEL ERREICHT!", width/2, height/2 - baseSize * 0.1);
+    textSize(baseSize * 0.05);
     text("Gute Arbeit.", width/2, height/2);
-    return; // Wenn gewonnen, zeichnen wir keinen Pfeil mehr
   }
 
-  if (gameActive) {
-    // Info Text oben
-    textSize(16);
-    text("Suche das Signal...", width/2, 40);
+  if (gameActive && !hasWon) {
+    // Info Texte skalierbar
+    textSize(baseSize * 0.04);
+    text("Suche das Signal...", width/2, height * 0.1);
     
-    textSize(30);
-    text(round(distanceMeters) + " m", width/2, 80);
+    textSize(baseSize * 0.1);
+    text(round(distanceMeters) + " m", width/2, height * 0.18);
 
-    // Fortschrittsbalken oder Text für die 3 Sekunden
     if (distanceMeters < 10) {
       fill(0, 100, 0);
-      textSize(14);
+      textSize(baseSize * 0.04);
       let secondsLeft = ((zoneDuration - timeInZone) / 1000).toFixed(1);
-      text(`Halten! ${secondsLeft}s`, width/2, 120);
+      text(`Halten! ${secondsLeft}s`, width/2, height * 0.25);
     }
 
-    // Pfeil zeichnen
-    drawCompassArrow();
+    drawCompassArrow(baseSize);
   }
+}
+
+function drawCompassArrow(s) {
+  push();
+  translate(width / 2, height / 2);
+  
+  // Die Magie: Bearing (Zielrichtung) MINUS Heading (deine Blickrichtung)
+  // Wenn du dich drehst, ändert sich 'heading', und der Pfeil dreht sich mit!
+  let angleToTarget = radians(bearing - heading);
+  rotate(angleToTarget);
+  
+  // Skalierbarer Pfeil (basierend auf der kleinsten Bildschirmseite 's')
+  let arrowSize = s * 0.2; 
+  
+  stroke(0);
+  strokeWeight(max(1, s * 0.005));
+  fill(255, 50, 50); 
+  
+  beginShape();
+  vertex(0, -arrowSize);           // Spitze
+  vertex(arrowSize * 0.4, arrowSize * 0.5);   // Rechts unten
+  vertex(0, arrowSize * 0.2);      // Einbuchtung
+  vertex(-arrowSize * 0.4, arrowSize * 0.5);  // Links unten
+  endShape(CLOSE);
+  
+  fill(0);
+  noStroke();
+  textSize(s * 0.05);
+  text("Ziel", 0, -arrowSize - (s * 0.05));
+  pop();
 }
 
 function checkWinCondition() {
@@ -320,4 +346,11 @@ function calcBearing(lat1, lon1, lat2, lon2) {
             sin(radians(lat1)) * cos(radians(lat2)) * cos(radians(lon2 - lon1));
   const brng = degrees(atan2(y, x));
   return (brng + 360) % 360; 
+}
+
+// Damit die Website sich anpasst, wenn man das Handy dreht (Querformat/Hochformat)
+function windowResized() {
+  resizeCanvas(windowWidth, windowHeight);
+  // Button-Position bei Größenänderung anpassen
+  startBtn.position(width/2 - 100, height - 80);
 }
