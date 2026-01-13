@@ -12,18 +12,18 @@ let currentLat = 0;
 let currentLon = 0;
 let targetLat = 0;
 let targetLon = 0;
-let hasGPS = false; // Haben wir schon ein Signal?
+let hasGPS = false; 
 
-// Kompass & Navigation
-let heading = 0;
+// Navigation (Jetzt über GPS Laufrichtung)
+let gpsHeading = 0; 
 let bearing = 0;
 let distanceMeters = 0;
 
 // Spiel-Logik
-let gameActive = false;       // Läuft das Spiel gerade?
-let timeInZone = 0;           // Wie lange (ms) steht der Spieler schon im Zielkreis?
-let zoneDuration = 3000;      // 3 Sekunden müssen erreicht werden
-let hasWon = false;           // Ziel erreicht?
+let gameActive = false;       
+let timeInZone = 0;           
+let zoneDuration = 3000;      
+let hasWon = false;           
 
 // UI Elemente
 let startBtn;
@@ -33,15 +33,12 @@ function setup() {
   textSize(16);
   textAlign(CENTER, CENTER);
 
-  // Button erstellen (wird je nach Zustand ein-/ausgeblendet)
   startBtn = createButton('Spiel starten / Neues Ziel');
   startBtn.position(width/2 - 100, height - 80);
   startBtn.size(200, 50);
   startBtn.mousePressed(startNewGame);
-  // Button erst deaktivieren, bis GPS da ist
   startBtn.attribute('disabled', ''); 
 
-  // GPS Tracking starten
   if (navigator.geolocation) {
     navigator.geolocation.watchPosition(updatePosition, (err) => {
       console.warn('GPS ERROR(' + err.code + '): ' + err.message);
@@ -63,29 +60,27 @@ function updatePosition(position) {
   currentLat = position.coords.latitude;
   currentLon = position.coords.longitude;
   
+  // Wir nutzen die Bewegungsrichtung vom GPS (coords.heading)
+  if (position.coords.heading !== null) {
+    gpsHeading = position.coords.heading;
+  }
+  
   if (!hasGPS) {
     hasGPS = true;
-    startBtn.removeAttribute('disabled'); // Jetzt darf man starten
+    startBtn.removeAttribute('disabled'); 
     startBtn.html("Start: Zufallsziel suchen");
   }
   
-  // Wenn Spiel aktiv, berechne Abstand zum Ziel
   if (gameActive || hasWon) {
     distanceMeters = calcGeoDistance(currentLat, currentLon, targetLat, targetLon);
     bearing = calcBearing(currentLat, currentLon, targetLat, targetLon);
   }
 }
 
-// Generiert neue Zielkoordinaten (100m - 150m entfernt)
 function generateRandomTarget() {
-  // Zufälliger Abstand zwischen 100 und 150 Metern
-  let distMeters = random(20, 30);
-  // Zufälliger Winkel (0 bis 360 Grad)
+  let distMeters = random(20, 30); // Dein gewünschter Bereich
   let angleDeg = random(0, 360);
-  
-  // Umrechnung in Koordinaten (Vereinfachte Projektion für kurze Distanzen)
-  // 1 Grad Breite ca. 111km, 1 Grad Länge variiert je nach Breite
-  let earthRadius = 6371000; // Meter
+  let earthRadius = 6371000; 
   
   let dx = distMeters * sin(radians(angleDeg));
   let dy = distMeters * cos(radians(angleDeg));
@@ -95,29 +90,20 @@ function generateRandomTarget() {
 
   targetLat = currentLat + deltaLat;
   targetLon = currentLon + deltaLon;
-  
-  console.log(`Neues Ziel: ${distMeters.toFixed(1)}m entfernt, Winkel ${angleDeg.toFixed(0)}°`);
 }
 
 // =======================
-// INTERAKTION (BUTTON & KLICK)
+// INTERAKTION
 // =======================
 
 async function startNewGame() {
-  await Tone.start(); // Audio Context wecken
-  
-  // Kompass-Erlaubnis für iOS (falls noch nicht geschehen)
-  requestCompassPermission();
+  await Tone.start(); 
 
-  // Spiel zurücksetzen
   hasWon = false;
   timeInZone = 0;
   gameActive = true;
-  
-  // Neues Ziel berechnen
   generateRandomTarget();
   
-  // Audio starten
   if (!player) {
     player = new Tone.Player({
       url: "audio/sine_beep.mp3", 
@@ -125,47 +111,21 @@ async function startNewGame() {
     }).toDestination();
   }
 
-  // Loop starten
   if (!loopRunning) {
     loopRunning = true;
     startLoop();
   }
   
-  // Button verstecken während des Spiels
   startBtn.hide();
 }
 
-function requestCompassPermission() {
-  if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-    DeviceOrientationEvent.requestPermission()
-      .then(response => {
-        if (response === 'granted') {
-          window.addEventListener('deviceorientation', handleOrientation);
-        }
-      })
-      .catch(console.error);
-  } else {
-    window.addEventListener('deviceorientation', handleOrientation);
-  }
-}
-
-function handleOrientation(event) {
-  if (event.webkitCompassHeading) {
-    heading = event.webkitCompassHeading;
-  } else {
-    heading = 360 - event.alpha; 
-  }
-}
-
 // =======================
-// DRAW LOOP (VISUALISIERUNG & LOGIK)
+// DRAW LOOP (VISUALISIERUNG)
 // =======================
 
 function draw() {
-  // Dynamische Schriftgröße basierend auf der Bildschirmbreite
   let baseSize = min(width, height);
   
-  // 1. Hintergrund-Logik (Farbverlauf wie gehabt)
   if (gameActive && !hasWon) {
     checkWinCondition();
     let progress = constrain(timeInZone / zoneDuration, 0, 1);
@@ -194,18 +154,17 @@ function draw() {
   }
 
   if (gameActive && !hasWon) {
-    // Info Texte skalierbar
     textSize(baseSize * 0.04);
-    text("Suche das Signal...", width/2, height * 0.1);
+    text("Lauf los zum Signal...", width/2, height * 0.1);
     
     textSize(baseSize * 0.1);
     text(round(distanceMeters) + " m", width/2, height * 0.18);
 
-    if (distanceMeters < 10) {
+    if (distanceMeters < 5) {
       fill(0, 100, 0);
       textSize(baseSize * 0.04);
       let secondsLeft = ((zoneDuration - timeInZone) / 1000).toFixed(1);
-      text(`Halten! ${secondsLeft}s`, width/2, height * 0.25);
+      text(`Stehen bleiben! ${secondsLeft}s`, width/2, height * 0.25);
     }
 
     drawCompassArrow(baseSize);
@@ -216,23 +175,20 @@ function drawCompassArrow(s) {
   push();
   translate(width / 2, height / 2);
   
-  // Die Magie: Bearing (Zielrichtung) MINUS Heading (deine Blickrichtung)
-  // Wenn du dich drehst, ändert sich 'heading', und der Pfeil dreht sich mit!
-  let angleToTarget = radians(bearing - heading);
+  // Nutzt die GPS Laufrichtung (gpsHeading) statt den Magnet-Kompass
+  let angleToTarget = radians(bearing - gpsHeading);
   rotate(angleToTarget);
   
-  // Skalierbarer Pfeil (basierend auf der kleinsten Bildschirmseite 's')
   let arrowSize = s * 0.2; 
-  
   stroke(0);
   strokeWeight(max(1, s * 0.005));
   fill(255, 50, 50); 
   
   beginShape();
-  vertex(0, -arrowSize);           // Spitze
-  vertex(arrowSize * 0.4, arrowSize * 0.5);   // Rechts unten
-  vertex(0, arrowSize * 0.2);      // Einbuchtung
-  vertex(-arrowSize * 0.4, arrowSize * 0.5);  // Links unten
+  vertex(0, -arrowSize);           
+  vertex(arrowSize * 0.4, arrowSize * 0.5);   
+  vertex(0, arrowSize * 0.2);      
+  vertex(-arrowSize * 0.4, arrowSize * 0.5);  
   endShape(CLOSE);
   
   fill(0);
@@ -243,16 +199,12 @@ function drawCompassArrow(s) {
 }
 
 function checkWinCondition() {
-  // Logik: Ist der Spieler näher als 10m?
   if (distanceMeters < 5) {
-    timeInZone += deltaTime; // deltaTime ist die Zeit seit dem letzten Frame in ms
-    
+    timeInZone += deltaTime; 
     if (timeInZone >= zoneDuration) {
       gameWin();
     }
   } else {
-    // Wenn man den Kreis verlässt, wird der Timer zurückgesetzt (oder langsam verringert?)
-    // Hier: Sofort Reset für mehr Schwierigkeit.
     timeInZone = 0;
   }
 }
@@ -260,35 +212,9 @@ function checkWinCondition() {
 function gameWin() {
   hasWon = true;
   gameActive = false;
-  stopLoop(); // Audio aus
-  
-  // Button wieder anzeigen für neue Runde
+  stopLoop(); 
   startBtn.show();
   startBtn.html("Neues Ziel bestimmen");
-}
-
-function drawCompassArrow() {
-  push();
-  translate(width / 2, height / 2);
-  let angleToTarget = radians(bearing - heading);
-  rotate(angleToTarget);
-  
-  stroke(0);
-  strokeWeight(2);
-  fill(255, 50, 50); 
-  
-  // Pfeil-Form
-  beginShape();
-  vertex(0, -60);
-  vertex(20, 30);
-  vertex(0, 15);
-  vertex(-20, 30);
-  endShape(CLOSE);
-  
-  fill(0);
-  noStroke();
-  text("Ziel", 0, -80);
-  pop();
 }
 
 // =======================
@@ -309,7 +235,6 @@ function stopLoop() {
 }
 
 function scheduleNext(time) {
-  // Je näher, desto schneller (bis 10m). Unter 10m Dauerton oder sehr schnell.
   let distClamped = constrain(distanceMeters, 1, 30);
   let interval = map(distClamped, 0, 30, 0.1, 1.5);
 
@@ -348,9 +273,7 @@ function calcBearing(lat1, lon1, lat2, lon2) {
   return (brng + 360) % 360; 
 }
 
-// Damit die Website sich anpasst, wenn man das Handy dreht (Querformat/Hochformat)
 function windowResized() {
   resizeCanvas(windowWidth, windowHeight);
-  // Button-Position bei Größenänderung anpassen
   startBtn.position(width/2 - 100, height - 80);
 }
