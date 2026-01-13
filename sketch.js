@@ -79,7 +79,7 @@ function updatePosition(position) {
 // Generiert neue Zielkoordinaten (100m - 150m entfernt)
 function generateRandomTarget() {
   // Zufälliger Abstand zwischen 100 und 150 Metern
-  let distMeters = random(100, 150);
+  let distMeters = random(20, 30);
   // Zufälliger Winkel (0 bis 360 Grad)
   let angleDeg = random(0, 360);
   
@@ -244,7 +244,7 @@ function drawCompassArrow(s) {
 
 function checkWinCondition() {
   // Logik: Ist der Spieler näher als 10m?
-  if (distanceMeters < 10) {
+  if (distanceMeters < 5) {
     timeInZone += deltaTime; // deltaTime ist die Zeit seit dem letzten Frame in ms
     
     if (timeInZone >= zoneDuration) {
