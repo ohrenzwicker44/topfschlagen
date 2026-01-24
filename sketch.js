@@ -1,279 +1,269 @@
 // =======================
-// GLOBALE VARIABLEN
+// KONFIGURATION
 // =======================
 
-// Audio & Loop
-let player = null;
-let loopRunning = false;
-let eventId = null;
+// Dateipfade anpassen!
+const soundConfig = [
+  {
+    id: 0,
+    color: [255, 0, 0, 100], // Rot
+    samples: {
+      outer: ["audio/p1_out_1.mp3", "audio/p1_out_2.mp3", "audio/p1_out_3.mp3"],
+      inner: ["audio/p1_in_1.mp3", "audio/p1_in_2.mp3", "audio/p1_in_3.mp3"],
+      center: "audio/p1_center.mp3"
+    }
+  },
+  {
+    id: 1,
+    color: [0, 255, 0, 100], // Grün
+    samples: {
+      outer: ["audio/p2_out_1.mp3", "audio/p2_out_2.mp3", "audio/p2_out_3.mp3"],
+      inner: ["audio/p2_in_1.mp3", "audio/p2_in_2.mp3", "audio/p2_in_3.mp3"],
+      center: "audio/p2_center.mp3"
+    }
+  },
+  {
+    id: 2,
+    color: [0, 0, 255, 100], // Blau
+    samples: {
+      outer: ["audio/p3_out_1.mp3", "audio/p3_out_2.mp3", "audio/p3_out_3.mp3"],
+      inner: ["audio/p3_in_1.mp3", "audio/p3_in_2.mp3", "audio/p3_in_3.mp3"],
+      center: "audio/p3_center.mp3"
+    }
+  }
+];
 
-// GPS Positionen
-let currentLat = 0;
-let currentLon = 0;
-let targetLat = 0;
-let targetLon = 0;
-let hasGPS = false; 
+// Distanz-Einstellungen (Meter)
+const DIST_MAX = 150;      // Ab hier beginnt Sound
+const DIST_CROSSFADE = 40; // Hier Übergang Outer -> Inner
+const DIST_CENTER = 8;     // Zentrum
 
-// Navigation (Jetzt über GPS Laufrichtung)
-let gpsHeading = 0; 
-let bearing = 0;
-let distanceMeters = 0;
+// Variablen
+let soundSpots = [];
+let currentLat = 0, currentLon = 0;
+let hasGPS = false;
+let audioStarted = false;
+let startBtn, randomizeBtn;
 
-// Spiel-Logik
-let gameActive = false;       
-let timeInZone = 0;           
-let zoneDuration = 3000;      
-let hasWon = false;           
+// =======================
+// KLASSE: SOUNDSPOT (Vereinfacht)
+// =======================
+class SoundSpot {
+  constructor(config) {
+    this.color = config.color;
+    this.lat = 0;
+    this.lon = 0;
+    this.active = false;
+    this.distance = 9999;
+    
+    // --- AUDIO SETUP ---
+    // Wir erstellen Gruppen-Gains statt Einzel-Gains
+    this.groupGains = {
+      outer: new Tone.Gain(0).toDestination(),
+      inner: new Tone.Gain(0).toDestination(),
+      center: new Tone.Gain(1).toDestination() // Center ist one-shot, Gain bleibt offen
+    };
 
-// UI Elemente
-let startBtn;
+    // Players laden und in die Gruppen routen
+    this.players = { outer: [], inner: [], center: null };
+
+    // Outer Loops -> Outer Group Gain
+    config.samples.outer.forEach(url => {
+      // Loop aktiviert, autostart, volume 0 (wird über Group Gain geregelt)
+      const p = new Tone.Player({ url: url, loop: true, fadeOut: 0.5 }).start();
+      p.connect(this.groupGains.outer);
+      this.players.outer.push(p);
+    });
+
+    // Inner Loops -> Inner Group Gain
+    config.samples.inner.forEach(url => {
+      const p = new Tone.Player({ url: url, loop: true, fadeOut: 0.5 }).start();
+      p.connect(this.groupGains.inner);
+      this.players.inner.push(p);
+    });
+
+    // Center -> Direkt raus
+    this.players.center = new Tone.Player({ url: config.samples.center, loop: false }).toDestination();
+    
+    this.centerTriggered = false;
+  }
+
+  setCoordinates(lat, lon) {
+    this.lat = lat;
+    this.lon = lon;
+    this.active = true;
+  }
+
+  update(userLat, userLon) {
+    if (!this.active || !audioStarted) return;
+
+    this.distance = calcGeoDistance(userLat, userLon, this.lat, this.lon);
+    
+    // === VEREINFACHTE LOGIK ===
+    
+    // 1. Zu weit weg? Alles aus.
+    if (this.distance > DIST_MAX) {
+      this.groupGains.outer.gain.rampTo(0, 0.5);
+      this.groupGains.inner.gain.rampTo(0, 0.5);
+      return;
+    }
+
+    // 2. Bereich "OUTER" (Zwischen 40m und 150m)
+    if (this.distance > DIST_CROSSFADE) {
+      // Mapping: Bei 150m = 0 Lautstärke, bei 40m = 1 Lautstärke
+      let vol = map(this.distance, DIST_MAX, DIST_CROSSFADE, 0, 1, true);
+      
+      this.groupGains.outer.gain.rampTo(vol, 0.1); // Outer wird lauter je näher
+      this.groupGains.inner.gain.rampTo(0, 0.1);   // Inner ist stumm
+      this.centerTriggered = false; // Reset Center
+    }
+    
+    // 3. Bereich "INNER" (Unter 40m)
+    else {
+      // Mapping: Bei 40m = 0 (für Inner), bei 8m = 1
+      // Hier machen wir einen Crossfade: Outer geht weg, Inner kommt.
+      
+      let innerVol = map(this.distance, DIST_CROSSFADE, DIST_CENTER, 0, 1, true);
+      let outerVol = 1 - innerVol; // Gegensätzlich
+      
+      this.groupGains.outer.gain.rampTo(outerVol, 0.1);
+      this.groupGains.inner.gain.rampTo(innerVol, 0.1);
+      
+      // Center Trigger (< 8m)
+      if (this.distance < DIST_CENTER && !this.centerTriggered) {
+        this.players.center.start();
+        this.centerTriggered = true;
+        if (navigator.vibrate) navigator.vibrate(200);
+      }
+    }
+  }
+
+  draw() {
+    if (!this.active) return;
+    // Visuelle Darstellung:
+    // Distanz bestimmt Größe. 
+    // Wir begrenzen die visuelle Größe, damit der Screen nicht explodiert.
+    let visualSize = map(this.distance, 0, DIST_MAX, windowWidth, 20, true);
+    
+    noStroke();
+    fill(this.color);
+    ellipse(width/2, height/2, visualSize);
+  }
+}
+
+// =======================
+// P5 SETUP & LOOP
+// =======================
 
 function setup() {
   createCanvas(windowWidth, windowHeight);
-  textSize(16);
   textAlign(CENTER, CENTER);
 
-  startBtn = createButton('Spiel starten / Neues Ziel');
-  startBtn.position(width/2 - 100, height - 80);
-  startBtn.size(200, 50);
-  startBtn.mousePressed(startNewGame);
-  startBtn.attribute('disabled', ''); 
+  // Spots initialisieren
+  soundConfig.forEach(conf => {
+    soundSpots.push(new SoundSpot(conf));
+  });
 
+  // UI
+  startBtn = createButton('Start Audio & GPS');
+  styleButton(startBtn, height - 100);
+  startBtn.mousePressed(startSystem);
+
+  randomizeBtn = createButton('Neue Punkte würfeln');
+  styleButton(randomizeBtn, height - 180);
+  randomizeBtn.mousePressed(setRandomPoints);
+  randomizeBtn.hide();
+
+  // GPS Setup
   if (navigator.geolocation) {
-    navigator.geolocation.watchPosition(updatePosition, (err) => {
-      console.warn('GPS ERROR(' + err.code + '): ' + err.message);
-    }, {
-      enableHighAccuracy: true,
-      maximumAge: 0,
-      timeout: 5000
-    });
-  } else {
-    alert("Geolocation nicht unterstützt.");
+    navigator.geolocation.watchPosition(
+      pos => {
+        currentLat = pos.coords.latitude;
+        currentLon = pos.coords.longitude;
+        hasGPS = true;
+        soundSpots.forEach(s => s.update(currentLat, currentLon));
+      },
+      err => console.warn(err),
+      { enableHighAccuracy: true, maximumAge: 0 }
+    );
   }
 }
-
-// =======================
-// GPS UPDATE & MATHE
-// =======================
-
-function updatePosition(position) {
-  currentLat = position.coords.latitude;
-  currentLon = position.coords.longitude;
-  
-  // Wir nutzen die Bewegungsrichtung vom GPS (coords.heading)
-  if (position.coords.heading !== null) {
-    gpsHeading = position.coords.heading;
-  }
-  
-  if (!hasGPS) {
-    hasGPS = true;
-    startBtn.removeAttribute('disabled'); 
-    startBtn.html("Start: Zufallsziel suchen");
-  }
-  
-  if (gameActive || hasWon) {
-    distanceMeters = calcGeoDistance(currentLat, currentLon, targetLat, targetLon);
-    bearing = calcBearing(currentLat, currentLon, targetLat, targetLon);
-  }
-}
-
-function generateRandomTarget() {
-  let distMeters = random(20, 30); // Dein gewünschter Bereich
-  let angleDeg = random(0, 360);
-  let earthRadius = 6371000; 
-  
-  let dx = distMeters * sin(radians(angleDeg));
-  let dy = distMeters * cos(radians(angleDeg));
-
-  let deltaLat = (dy / earthRadius) * (180 / PI);
-  let deltaLon = (dx / (earthRadius * cos(radians(currentLat)))) * (180 / PI);
-
-  targetLat = currentLat + deltaLat;
-  targetLon = currentLon + deltaLon;
-}
-
-// =======================
-// INTERAKTION
-// =======================
-
-async function startNewGame() {
-  await Tone.start(); 
-
-  hasWon = false;
-  timeInZone = 0;
-  gameActive = true;
-  generateRandomTarget();
-  
-  if (!player) {
-    player = new Tone.Player({
-      url: "audio/sine_beep.mp3", 
-      autostart: false
-    }).toDestination();
-  }
-
-  if (!loopRunning) {
-    loopRunning = true;
-    startLoop();
-  }
-  
-  startBtn.hide();
-}
-
-// =======================
-// DRAW LOOP (VISUALISIERUNG)
-// =======================
 
 function draw() {
-  let baseSize = min(width, height);
-  
-  if (gameActive && !hasWon) {
-    checkWinCondition();
-    let progress = constrain(timeInZone / zoneDuration, 0, 1);
-    let bgColor = lerpColor(color(240), color(100, 255, 100), progress);
-    background(bgColor);
-  } else if (hasWon) {
-    background(0, 255, 0);
-  } else {
-    background(200);
-  }
+  background(240);
 
-  fill(0);
-  noStroke();
-  
-  if (!hasGPS) {
-    textSize(baseSize * 0.05);
-    text("Warte auf GPS Signal...", width/2, height/2);
+  if (!audioStarted) {
+    fill(0); textSize(16);
+    text("Klicke Start für Sound", width/2, height/2);
     return;
   }
 
-  if (hasWon) {
-    textSize(baseSize * 0.1);
-    text("ZIEL ERREICHT!", width/2, height/2 - baseSize * 0.1);
-    textSize(baseSize * 0.05);
-    text("Gute Arbeit.", width/2, height/2);
-  }
-
-  if (gameActive && !hasWon) {
-    textSize(baseSize * 0.04);
-    text("Lauf los zum Signal...", width/2, height * 0.1);
-    
-    textSize(baseSize * 0.1);
-    text(round(distanceMeters) + " m", width/2, height * 0.18);
-
-    if (distanceMeters < 5) {
-      fill(0, 100, 0);
-      textSize(baseSize * 0.04);
-      let secondsLeft = ((zoneDuration - timeInZone) / 1000).toFixed(1);
-      text(`Stehen bleiben! ${secondsLeft}s`, width/2, height * 0.25);
-    }
-
-    drawCompassArrow(baseSize);
-  }
-}
-
-function drawCompassArrow(s) {
-  push();
-  translate(width / 2, height / 2);
+  // Sortieren: Größte Kreise (kleinste Distanz) zuerst zeichnen?
+  // User Wunsch: "äußerster Rand soll zeigen, welchem ich am nächsten bin."
+  // -> Das bedeutet, der größte Kreis muss HINTEN liegen, damit der Rand sichtbar ist?
+  // Wenn Grün (nah/groß) über Rot (weit/klein) liegt, verdeckt Grün alles.
+  // Damit man beide sieht, muss der kleine Rote VOR dem großen Grünen liegen.
+  // Also: Zeichne von NAH (groß) nach WEIT (klein).
+  // Array kopieren und sortieren nach Distanz (aufsteigend) -> 
+  // [0] ist nah (groß), [end] ist weit (klein).
   
-  // Nutzt die GPS Laufrichtung (gpsHeading) statt den Magnet-Kompass
-  let angleToTarget = radians(bearing - gpsHeading);
-  rotate(angleToTarget);
+  let sorted = [...soundSpots].sort((a, b) => a.distance - b.distance);
   
-  let arrowSize = s * 0.2; 
-  stroke(0);
-  strokeWeight(max(1, s * 0.005));
-  fill(255, 50, 50); 
+  // Aber p5 malt wie ein Maler: Was zuerst gemalt wird, liegt UNTEN.
+  // Wir wollen Groß UNTEN, Klein OBEN.
+  // Also erst den Nahen malen.
   
-  beginShape();
-  vertex(0, -arrowSize);           
-  vertex(arrowSize * 0.4, arrowSize * 0.5);   
-  vertex(0, arrowSize * 0.2);      
-  vertex(-arrowSize * 0.4, arrowSize * 0.5);  
-  endShape(CLOSE);
+  sorted.forEach(spot => spot.draw());
   
-  fill(0);
-  noStroke();
-  textSize(s * 0.05);
-  text("Ziel", 0, -arrowSize - (s * 0.05));
-  pop();
-}
-
-function checkWinCondition() {
-  if (distanceMeters < 5) {
-    timeInZone += deltaTime; 
-    if (timeInZone >= zoneDuration) {
-      gameWin();
-    }
-  } else {
-    timeInZone = 0;
-  }
-}
-
-function gameWin() {
-  hasWon = true;
-  gameActive = false;
-  stopLoop(); 
-  startBtn.show();
-  startBtn.html("Neues Ziel bestimmen");
+  // Spieler Punkt
+  fill(0); circle(width/2, height/2, 8);
 }
 
 // =======================
-// AUDIO-LOGIK
+// HELFER
 // =======================
 
-function startLoop() {
-  Tone.Transport.start();
-  scheduleNext(Tone.Transport.seconds);
+async function startSystem() {
+  await Tone.start();
+  audioStarted = true;
+  startBtn.hide();
+  randomizeBtn.show();
 }
 
-function stopLoop() {
-  loopRunning = false;
-  if (eventId !== null) {
-    Tone.Transport.clear(eventId);
-    eventId = null;
+function setRandomPoints() {
+  if (!hasGPS) return;
+  
+  // Punkte im Dreieck um den Spieler anordnen
+  let dist = 100; // Meter
+  for(let i=0; i<3; i++) {
+    let angle = i * 120 + random(-10, 10);
+    let newPos = movePoint(currentLat, currentLon, dist, angle);
+    soundSpots[i].setCoordinates(newPos.lat, newPos.lon);
   }
 }
 
-function scheduleNext(time) {
-  let distClamped = constrain(distanceMeters, 1, 30);
-  let interval = map(distClamped, 0, 30, 0.1, 1.5);
-
-  eventId = Tone.Transport.scheduleOnce((t) => {
-    if (!player) return;
-    player.start(t);
-    if (loopRunning) {
-      scheduleNext(t + interval);
-    }
-  }, time);
+function styleButton(btn, yPos) {
+  btn.position(width/2 - 100, yPos);
+  btn.size(200, 50);
+  btn.style("background", "white");
+  btn.style("border", "1px solid black");
+  btn.style("font-size", "16px");
 }
 
-// =======================
-// MATHE HELFER
-// =======================
-
+// Mathe Magie (Haversine & Destination Point)
 function calcGeoDistance(lat1, lon1, lat2, lon2) {
   const R = 6371e3; 
-  const phi1 = radians(lat1);
-  const phi2 = radians(lat2);
-  const dPhi = radians(lat2 - lat1);
-  const dLambda = radians(lon2 - lon1);
-
-  const a = sin(dPhi / 2) * sin(dPhi / 2) +
-            cos(phi1) * cos(phi2) *
-            sin(dLambda / 2) * sin(dLambda / 2);
-  const c = 2 * atan2(sqrt(a), sqrt(1 - a));
-  return R * c;
+  const p1 = lat1 * Math.PI/180; const p2 = lat2 * Math.PI/180;
+  const dp = (lat2-lat1) * Math.PI/180; const dl = (lon2-lon1) * Math.PI/180;
+  const a = Math.sin(dp/2)*Math.sin(dp/2) + Math.cos(p1)*Math.cos(p2) * Math.sin(dl/2)*Math.sin(dl/2);
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 }
 
-function calcBearing(lat1, lon1, lat2, lon2) {
-  const y = sin(radians(lon2 - lon1)) * cos(radians(lat2));
-  const x = cos(radians(lat1)) * sin(radians(lat2)) -
-            sin(radians(lat1)) * cos(radians(lat2)) * cos(radians(lon2 - lon1));
-  const brng = degrees(atan2(y, x));
-  return (brng + 360) % 360; 
-}
-
-function windowResized() {
-  resizeCanvas(windowWidth, windowHeight);
-  startBtn.position(width/2 - 100, height - 80);
+function movePoint(lat, lon, dist, brngDeg) {
+  const R = 6371e3;
+  const brng = brngDeg * Math.PI/180;
+  const lat1 = lat * Math.PI/180, lon1 = lon * Math.PI/180;
+  let lat2 = Math.asin(Math.sin(lat1)*Math.cos(dist/R) + Math.cos(lat1)*Math.sin(dist/R)*Math.cos(brng));
+  let lon2 = lon1 + Math.atan2(Math.sin(brng)*Math.sin(dist/R)*Math.cos(lat1), Math.cos(dist/R)-Math.sin(lat1)*Math.sin(lat2));
+  return { lat: lat2*180/Math.PI, lon: lon2*180/Math.PI };
 }
