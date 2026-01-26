@@ -20,8 +20,8 @@ const config = {
 
 function setup() {
   createCanvas(windowWidth, windowHeight);
-  textFont('IBM Plex Sans');
   
+  // Audio Gain Nodes & Reverb Setup
   masterReverb = new Tone.Reverb({ decay: 4, wet: 0.4 }).toDestination();
   masterReverb.generate();
 
@@ -30,12 +30,13 @@ function setup() {
     soundSystem[k].centerGain = new Tone.Gain(0).connect(masterReverb);
   });
 
+  // GPS Beobachtung starten
   navigator.geolocation.watchPosition(pos => {
     userPos = { lat: pos.coords.latitude, lon: pos.coords.longitude };
-    // Initialisierung der Punkte, sobald GPS verfügbar ist
     if (points.length === 0) setPoints();
   }, null, { enableHighAccuracy: true });
 
+  // UI Event Listener
   document.getElementById('fix3').onclick = () => { mode = 'fix3'; setPoints(); updateUI(); };
   document.getElementById('var3').onclick = () => { mode = 'var3'; setPoints(); updateUI(); };
 }
@@ -44,39 +45,33 @@ function draw() {
   background('#F8F8F4');
 
   if (!audioStarted) { drawStartScreen(); return; }
-  if (!userPos || points.length < 3) { renderStatus("Warte auf GPS..."); return; }
+  if (!userPos || points.length < 3) { renderStatus("Warte auf GPS-Signal..."); return; }
 
-  // Distanzen berechnen
+  // 1. Distanzen berechnen
   EntfernungA = getDistance(userPos.lat, userPos.lon, points[0].lat, points[0].lon);
   EntfernungB = getDistance(userPos.lat, userPos.lon, points[1].lat, points[1].lon);
   EntfernungC = getDistance(userPos.lat, userPos.lon, points[2].lat, points[2].lon);
 
+  // 2. Audio Lautstärken anpassen
   updateAudio();
 
-  // Daten für Visualisierung aufbereiten
+  // 3. Visualisierung vorbereiten
   let data = [
-    { d: EntfernungA, c: colors[0], label: 'A' },
-    { d: EntfernungB, c: colors[1], label: 'B' },
-    { d: EntfernungC, c: colors[2], label: 'C' }
+    { d: EntfernungA, c: colors[0] },
+    { d: EntfernungB, c: colors[1] },
+    { d: EntfernungC, c: colors[2] }
   ];
 
-  // LOGIK: Größter Kreis oben.
-  // "Näher dran" bedeutet "Größerer Kreis".
-  // Damit der größte oben liegt, muss er ZULETZT gezeichnet werden.
-  // Wir sortieren also von WEIT ENTFERNT (klein) nach NAH DRAN (groß).
+  // SORTIERUNG: Damit der größte Kreis OBEN liegt, muss er ZULETZT gezeichnet werden.
+  // Da kleiner d = großer Kreis, sortieren wir Distanzen absteigend (groß nach klein).
   data.sort((a, b) => b.d - a.d); 
 
   noStroke();
   data.forEach(item => {
     fill(item.c);
-    // 200m = 10px, 0m = 80% Bildschirmbreite
+    // Visualisierung: 200m = 10px, 0m = 80% Bildschirmbreite
     let size = map(item.d, 200, 0, 10, width * 0.8, true);
     ellipse(width / 2, height / 2, size);
-    
-    // Optional: Distanz-Text anzeigen
-    fill(255);
-    textAlign(CENTER);
-    if (size > 40) text(floor(item.d) + "m", width/2, height/2 + (data.indexOf(item)*15));
   });
 }
 
@@ -87,11 +82,8 @@ function updateAudio() {
 }
 
 function applyVolume(sys, d) {
-  // Lauter werden beim Annähern (150m: -40dB, 0m: 0dB)
   let bgVol = map(d, 150, 0, -40, 0, true);
   sys.bgGain.gain.rampTo(Tone.dbToGain(bgVol), 0.5);
-  
-  // Center Sound nur ganz nah (20m)
   let cVol = map(d, 20, 0, -60, 0, true);
   sys.centerGain.gain.rampTo(d > 20 ? 0 : Tone.dbToGain(cVol), 0.5);
 }
@@ -103,20 +95,20 @@ function setPoints() {
   if (mode === 'fix3') {
     let saved = JSON.parse(localStorage.getItem('gpsPoints'));
     if (saved) {
-        points = saved;
+      points = saved;
     } else {
-        // Fallback falls nichts gespeichert: 3 Punkte in der Nähe generieren
-        for(let i=0; i<3; i++) points.push(generateRandomPoint(userPos, 50, 100));
+      // Fallback: Erzeugt 3 Punkte in der Umgebung (ca. 100m Versatz)
+      for(let i=0; i<3; i++) points.push(generateRandomPoint(userPos, 80, 120));
     }
   } else {
-    // VAR3 Modus: Randomisierung mit Abstandsregeln
+    // VAR3 MODUS: Randomisierung
     for (let i = 0; i < 3; i++) {
       let p, found = false;
       let attempts = 0;
       while (!found && attempts < 500) {
-        p = generateRandomPoint(userPos, 100, 200); // 100-200m von User
+        p = generateRandomPoint(userPos, 100, 200); // 100-200m von User weg
         
-        // Prüfen, ob Punkt zu nah an bereits generierten Punkten (min 100m)
+        // Prüfen ob min. 100m Abstand zu anderen bereits gesetzten Punkten
         let tooCloseToOthers = points.some(other => 
           getDistance(p.lat, p.lon, other.lat, other.lon) < 100
         );
@@ -138,7 +130,7 @@ function getDistance(lat1, lon1, lat2, lon2) {
 }
 
 function generateRandomPoint(center, minD, maxD) {
-  const r = random(minD, maxD) / 111320; // Umrechnung Meter in Grad (ungefähr)
+  const r = (random(minD, maxD)) / 111320; 
   const angle = random(TWO_PI);
   return { 
     lat: center.lat + r * cos(angle), 
@@ -146,4 +138,28 @@ function generateRandomPoint(center, minD, maxD) {
   };
 }
 
-// ... Restliche Hilfsfunktionen (mousePressed, startEverything, etc.) bleiben gleich ...
+function mousePressed() { if (!audioStarted) startEverything(); }
+
+async function startEverything() {
+  await Tone.start();
+  ['A','B','C'].forEach(k => {
+    config[k].bg.forEach(u => new Tone.Player({ url: u, loop: true, autostart: true, fadeIn: 2 }).connect(soundSystem[k].bgGain));
+    new Tone.Player({ url: config[k].center, loop: true, autostart: true, fadeIn: 1 }).connect(soundSystem[k].centerGain);
+  });
+  audioStarted = true;
+  document.getElementById('hotbar').style.display = 'flex';
+}
+
+function drawStartScreen() { 
+  fill(50); textAlign(CENTER, CENTER); textSize(18); 
+  text("Kopfhörer aufsetzen\n& Tippen zum Starten", width/2, height/2); 
+}
+
+function renderStatus(t) { fill(50); textAlign(CENTER); text(t, width/2, height/2); }
+
+function updateUI() {
+  document.getElementById('fix3').classList.toggle('active', mode === 'fix3');
+  document.getElementById('var3').classList.toggle('active', mode === 'var3');
+}
+
+function windowResized() { resizeCanvas(windowWidth, windowHeight); }
