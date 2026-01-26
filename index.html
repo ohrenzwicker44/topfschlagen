@@ -1,29 +1,36 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Topfschlagen</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
-    <style>
-        body { margin: 0; padding: 0; overflow: hidden; background: #F8F8F4; font-family: sans-serif; }
-        #hotbar { 
-            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); 
-            display: none; gap: 10px; z-index: 100; 
-        }
-        button { 
-            padding: 10px 20px; border: 2px solid #333; background: white; 
-            cursor: pointer; font-weight: bold; border-radius: 5px;
-        }
-        button.active { background: #333; color: white; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Klangwelten Setup</title>
+  <style>
+    body { font-family: sans-serif; background: #F8F8F4; padding: 20px; text-align: center; }
+    .btn { display: block; width: 100%; padding: 15px; margin: 10px 0; border: 1px solid #777; background: white; cursor: pointer; }
+    #status { color: #888; font-size: 12px; margin-top: 20px; }
+  </style>
 </head>
 <body>
-    <div id="hotbar">
-        <button id="fix3" class="active">Fix Modus</button>
-        <button id="var3">Zufalls Modus</button>
-    </div>
-    <script src="sketch.js"></script>
+  <h3>GPS Setup</h3>
+  <button class="btn" onclick="savePoint(0)">Punkt A speichern</button>
+  <button class="btn" onclick="savePoint(1)">Punkt B speichern</button>
+  <button class="btn" onclick="savePoint(2)">Punkt C speichern</button>
+  <div id="status">Suche Satelliten...</div>
+
+  <script>
+    let currentPos = null;
+    navigator.geolocation.watchPosition(pos => {
+      currentPos = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+      document.getElementById('status').innerText = `GPS: ${currentPos.lat.toFixed(6)}, ${currentPos.lon.toFixed(6)}`;
+    }, null, { enableHighAccuracy: true });
+
+    function savePoint(i) {
+      if (!currentPos) return alert("Kein Signal!");
+      let saved = JSON.parse(localStorage.getItem('gpsPoints')) || [null, null, null];
+      saved[i] = currentPos;
+      localStorage.setItem('gpsPoints', JSON.stringify(saved));
+      alert("Punkt " + (i + 1) + " fixiert.");
+    }
+  </script>
 </body>
 </html>
