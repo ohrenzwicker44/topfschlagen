@@ -3,82 +3,36 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GPS Setup</title>
+    <title>Klangwelten Setup</title>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300&display=swap" rel="stylesheet">
     <style>
-        body { font-family: sans-serif; padding: 20px; background: #f0f0f0; }
-        .spot-card { background: white; padding: 15px; margin-bottom: 15px; border-radius: 8px; border-left: 10px solid #ccc; }
-        input { padding: 5px; width: 120px; margin: 5px; }
-        button { padding: 10px; margin-top: 5px; cursor: pointer; }
-        .btn-save { background: #4CAF50; color: white; border: none; width: 100%; font-size: 18px; margin-top: 20px;}
-        .btn-gps { background: #2196F3; color: white; border: none; }
+        body { font-family: 'IBM Plex Sans', sans-serif; background: #F8F8F4; padding: 40px; text-align: center; }
+        .btn { display: block; width: 100%; padding: 20px; margin: 10px 0; border: 1px solid #777; background: white; cursor: pointer; border-radius: 4px; }
+        .btn:active { background: #E0E0E0; }
+        #status { color: #888; font-size: 14px; margin-top: 20px; }
     </style>
 </head>
 <body>
-
-    <h2>📍 Klang-Punkte Konfigurator</h2>
-    <p>Hier kannst du die 3 Zielpunkte definieren. Sie werden auf diesem Gerät gespeichert.</p>
-
-    <div id="container"></div>
-
-    <button onclick="saveAndPlay()" class="btn-save">💾 Speichern & Zum Spiel</button>
-    <br><br>
-    <button onclick="clearData()" style="background:#888; color:white;">🗑️ Reset / Löschen</button>
+    <h2>Punkt Speichern</h2>
+    <button class="btn" onclick="savePoint(0)">Punkt A (Ocker) hier speichern</button>
+    <button class="btn" onclick="savePoint(1)">Punkt B (Grün) hier speichern</button>
+    <button class="btn" onclick="savePoint(2)">Punkt C (Weinrot) hier speichern</button>
+    <div id="status">Warte auf GPS...</div>
 
     <script>
-        // Farben zur Orientierung
-        const configs = [
-            { id: 0, name: "Punkt 1 (Rot)", color: "red" },
-            { id: 1, name: "Punkt 2 (Grün)", color: "green" },
-            { id: 2, name: "Punkt 3 (Blau)", color: "blue" }
-        ];
+        let currentPos = null;
 
-        // Beim Laden prüfen, ob schon Daten da sind
-        let savedData = JSON.parse(localStorage.getItem('gpsSoundSpots')) || [
-            { lat: 0, lon: 0 }, { lat: 0, lon: 0 }, { lat: 0, lon: 0 }
-        ];
+        navigator.geolocation.watchPosition(pos => {
+            currentPos = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+            document.getElementById('status').innerText = `Aktuell: ${currentPos.lat.toFixed(6)}, ${currentPos.lon.toFixed(6)}`;
+        }, err => console.error(err), { enableHighAccuracy: true });
 
-        const container = document.getElementById('container');
-
-        // HTML Generieren
-        configs.forEach((cfg, index) => {
-            let div = document.createElement('div');
-            div.className = 'spot-card';
-            div.style.borderColor = cfg.color;
-            div.innerHTML = `
-                <h3>${cfg.name}</h3>
-                <label>Lat: <input type="number" step="0.000001" id="lat_${index}" value="${savedData[index].lat}"></label>
-                <label>Lon: <input type="number" step="0.000001" id="lon_${index}" value="${savedData[index].lon}"></label>
-                <br>
-                <button class="btn-gps" onclick="setFromGPS(${index})">📍 Mein Standort hier speichern</button>
-            `;
-            container.appendChild(div);
-        });
-
-        function setFromGPS(index) {
-            if(!navigator.geolocation) return alert("Kein GPS verfügbar");
-            navigator.geolocation.getCurrentPosition(pos => {
-                document.getElementById(`lat_${index}`).value = pos.coords.latitude.toFixed(6);
-                document.getElementById(`lon_${index}`).value = pos.coords.longitude.toFixed(6);
-            }, err => alert("GPS Fehler: " + err.message), {enableHighAccuracy: true});
-        }
-
-        function saveAndPlay() {
-            let dataToSave = [];
-            for(let i=0; i<3; i++) {
-                let lat = parseFloat(document.getElementById(`lat_${i}`).value);
-                let lon = parseFloat(document.getElementById(`lon_${i}`).value);
-                dataToSave.push({ lat, lon });
-            }
-            // In LocalStorage speichern
-            localStorage.setItem('gpsSoundSpots', JSON.stringify(dataToSave));
-            
-            // Zur Hauptseite wechseln
-            window.location.href = "index.html";
-        }
-
-        function clearData() {
-            localStorage.removeItem('gpsSoundSpots');
-            location.reload();
+        function savePoint(index) {
+            if (!currentPos) return alert("Noch kein GPS-Signal!");
+            let saved = JSON.parse(localStorage.getItem('gpsPoints')) || [null, null, null];
+            saved[index] = currentPos;
+            localStorage.setItem('gpsPoints', JSON.stringify(saved));
+            alert(`Punkt ${index + 1} gespeichert!`);
         }
     </script>
 </body>
