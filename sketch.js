@@ -51,26 +51,44 @@ function draw() {
 
   updateAudio();
 
+  // DATEN SORTIEREN: Kleinste Entfernung zuerst (wird nach hinten gezeichnet)
   let data = [
-    { d: EntfernungA, c: colors[0] },
-    { d: EntfernungB, c: colors[1] },
-    { d: EntfernungC, c: colors[2] }
-  ].sort((a, b) => b.d - a.d); // Weiteste zuerst zeichnen
+    { d: EntfernungA, c: colors[0], id: 'A' },
+    { d: EntfernungB, c: colors[1], id: 'B' },
+    { d: EntfernungC, c: colors[2], id: 'C' }
+  ].sort((a, b) => a.d - b.d); 
 
+  // KREISE ZEICHNEN
   noStroke();
   data.forEach(item => {
     fill(item.c);
-    // 200m Distanz = Riesiger Kreis (Füllt den Screen)
-    // 0m Distanz = Kleiner Kreis (Zentrum)
-    let size = map(item.d, 200, 0, width * 1.5, 60, true);
+    // Logik: 0m = Riesig (width*2), 200m = Winzig (10px)
+    let size = map(item.d, 0, 200, width * 2, 10, true);
     ellipse(width / 2, height / 2, size);
   });
+
+  // METER-ANZEIGE AM UNTEREN RAND
+  drawDistanceLabels();
+}
+
+function drawDistanceLabels() {
+  let labelY = height - 40;
+  let spacing = width / 4;
   
-  // Optional: Debug-Text für dich zum Testen (unten links)
-  fill(0, 50);
-  textSize(12);
-  textAlign(LEFT);
-  text(`Distanzen: A:${round(EntfernungA)}m B:${round(EntfernungB)}m C:${round(EntfernungC)}m`, 20, height - 20);
+  textAlign(CENTER, CENTER);
+  textSize(22);
+  
+  // Punkt A
+  fill(colors[0]);
+  text(floor(EntfernungA), spacing * 1, labelY);
+  
+  // Punkt B
+  fill(colors[1]);
+  text(floor(EntfernungB), spacing * 2, labelY);
+  
+  // Punkt C
+  fill(colors[2]);
+  text(floor(EntfernungC), spacing * 3, labelY);
 }
 
 function updateAudio() {
@@ -80,11 +98,9 @@ function updateAudio() {
 }
 
 function applyVolume(sys, d) {
-  // Hintergrund fadet ab 150m ein
   let bgVol = map(d, 150, 0, -45, 0, true);
   sys.bgGain.gain.rampTo(Tone.dbToGain(bgVol), 0.5);
   
-  // Center fadet ab 20m ein
   let cVol = map(d, 20, 0, -60, 0, true);
   sys.centerGain.gain.rampTo(d > 20 ? 0 : Tone.dbToGain(cVol), 0.5);
 }
