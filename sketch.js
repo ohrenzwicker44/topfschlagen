@@ -11,7 +11,7 @@ let soundSystem = {
   C: { bgGain: null, centerGain: null }
 };
 
-const colors = [[205, 127, 50], [30, 90, 60], [128, 0, 32]];
+const colors = [[205, 127, 50, 150], [30, 90, 60, 150], [128, 0, 32, 150]];
 const config = {
   A: { bg: ["audio/a1.mp3", "audio/a2.mp3", "audio/a3.mp3"], center: "audio/a_center.mp3" },
   B: { bg: ["audio/b1.mp3", "audio/b2.mp3", "audio/b3.mp3"], center: "audio/b_center.mp3" },
