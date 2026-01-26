@@ -3,29 +3,27 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GPS Soundscape</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.37/Tone.js"></script>
+    <title>Topfschlagen</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
     <style>
-        body { margin: 0; padding: 0; overflow: hidden; background: #F8F8F4; font-family: 'IBM Plex Sans', sans-serif; }
+        body { margin: 0; padding: 0; overflow: hidden; background: #F8F8F4; font-family: sans-serif; }
         #hotbar { 
-            position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
-            display: none; gap: 15px; z-index: 100; 
+            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); 
+            display: none; gap: 10px; z-index: 100; 
         }
         button { 
-            padding: 12px 24px; cursor: pointer; border: 2px solid #333; 
-            background: white; border-radius: 25px; font-weight: bold;
+            padding: 10px 20px; border: 2px solid #333; background: white; 
+            cursor: pointer; font-weight: bold; border-radius: 5px;
         }
         button.active { background: #333; color: white; }
     </style>
 </head>
 <body>
-
     <div id="hotbar">
-        <button id="fix3" class="active">Fixierter Modus</button>
-        <button id="var3">Zufalls Modus (Var3)</button>
+        <button id="fix3" class="active">Fix Modus</button>
+        <button id="var3">Zufalls Modus</button>
     </div>
-
     <script src="sketch.js"></script>
 </body>
 </html>
