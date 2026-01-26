@@ -23,12 +23,9 @@ function setup() {
   createCanvas(windowWidth, windowHeight);
   textFont('IBM Plex Sans');
   
-  masterReverb = new Tone.Reverb({ decay: 5, wet: 0.3 }).toDestination();
-  masterReverb.generate();
-
   ['A', 'B', 'C'].forEach(k => {
-    soundSystem[k].bgGain = new Tone.Gain(0).connect(masterReverb);
-    soundSystem[k].centerGain = new Tone.Gain(0).connect(masterReverb);
+    soundSystem[k].bgGain = new Tone.Gain(0).toDestination();
+    soundSystem[k].centerGain = new Tone.Gain(0).toDestination();
   });
 
   navigator.geolocation.watchPosition(pos => {
