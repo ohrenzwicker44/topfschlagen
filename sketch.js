@@ -11,6 +11,7 @@ let soundSystem = {
   C: { bgGain: null, centerGain: null }
 };
 
+// Farben wie gehabt
 const colors = [[205, 127, 50], [30, 90, 60], [128, 0, 32]];
 const config = {
   A: { bg: ["audio/a1.mp3", "audio/a2.mp3", "audio/a3.mp3"], center: "audio/a_center.mp3" },
@@ -43,7 +44,7 @@ function draw() {
   background('#F8F8F4');
 
   if (!audioStarted) { drawStartScreen(); return; }
-  if (!userPos || points.length < 3) { renderStatus("Warte auf GPS Signal..."); return; }
+  if (!userPos || points.length < 3) { renderStatus("Warte auf GPS..."); return; }
 
   EntfernungA = getDistance(userPos.lat, userPos.lon, points[0].lat, points[0].lon);
   EntfernungB = getDistance(userPos.lat, userPos.lon, points[1].lat, points[1].lon);
@@ -51,44 +52,51 @@ function draw() {
 
   updateAudio();
 
-  // DATEN SORTIEREN: Kleinste Entfernung zuerst (wird nach hinten gezeichnet)
+  // DATEN SORTIEREN: Kleinste Entfernung (Nah) ZUERST zeichnen
+  // Dadurch landet der größte Kreis ganz hinten.
   let data = [
-    { d: EntfernungA, c: colors[0], id: 'A' },
-    { d: EntfernungB, c: colors[1], id: 'B' },
-    { d: EntfernungC, c: colors[2], id: 'C' }
+    { d: EntfernungA, c: colors[0] },
+    { d: EntfernungB, c: colors[1] },
+    { d: EntfernungC, c: colors[2] }
   ].sort((a, b) => a.d - b.d); 
 
-  // KREISE ZEICHNEN
   noStroke();
   data.forEach(item => {
     fill(item.c);
-    // Logik: 0m = Riesig (width*2), 200m = Winzig (10px)
-    let size = map(item.d, 0, 200, width * 2, 10, true);
+    // Skalierung: 
+    // 0m Entfernung -> Riesiger Kreis (2x Bildschirmbreite)
+    // 200m Entfernung -> Kleiner Kreis (20px)
+    let size = map(item.d, 0, 200, width * 2, 20, true);
     ellipse(width / 2, height / 2, size);
   });
 
-  // METER-ANZEIGE AM UNTEREN RAND
-  drawDistanceLabels();
+  updateFooter();
 }
 
-function drawDistanceLabels() {
-  let labelY = height - 40;
-  let spacing = width / 4;
-  
-  textAlign(CENTER, CENTER);
-  textSize(22);
-  
-  // Punkt A
-  fill(colors[0]);
-  text(floor(EntfernungA), spacing * 1, labelY);
-  
-  // Punkt B
-  fill(colors[1]);
-  text(floor(EntfernungB), spacing * 2, labelY);
-  
-  // Punkt C
-  fill(colors[2]);
-  text(floor(EntfernungC), spacing * 3, labelY);
+function updateFooter() {
+  const elA = document.getElementById('valA');
+  const elB = document.getElementById('valB');
+  const elC = document.getElementById('valC');
+
+  // Ganzzahlen setzen
+  elA.innerText = Math.floor(EntfernungA);
+  elB.innerText = Math.floor(EntfernungB);
+  elC.innerText = Math.floor(EntfernungC);
+
+  // Farben zuweisen (RGB Format für CSS)
+  elA.style.color = `rgb(${colors[0][0]}, ${colors[0][1]}, ${colors[0][2]})`;
+  elB.style.color = `rgb(${colors[1][0]}, ${colors[1][1]}, ${colors[1][2]})`;
+  elC.style.color = `rgb(${colors[2][0]}, ${colors[2][1]}, ${colors[2][2]})`;
+}
+
+// --- GPS & AUDIO LOGIK (Unverändert zum Vorherigen) ---
+
+function getDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371e3;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLon/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 }
 
 function updateAudio() {
@@ -100,7 +108,6 @@ function updateAudio() {
 function applyVolume(sys, d) {
   let bgVol = map(d, 150, 0, -45, 0, true);
   sys.bgGain.gain.rampTo(Tone.dbToGain(bgVol), 0.5);
-  
   let cVol = map(d, 20, 0, -60, 0, true);
   sys.centerGain.gain.rampTo(d > 20 ? 0 : Tone.dbToGain(cVol), 0.5);
 }
@@ -123,18 +130,10 @@ function setPoints() {
   }
 }
 
-function getDistance(lat1, lon1, lat2, lon2) {
-  const R = 6371e3;
-  const dLat = (lat2 - lat1) * PI / 180;
-  const dLon = (lon2 - lon1) * PI / 180;
-  const a = sin(dLat/2)**2 + cos(lat1*PI/180) * cos(lat2*PI/180) * sin(dLon/2)**2;
-  return R * 2 * atan2(sqrt(a), sqrt(1-a));
-}
-
 function generateRandomPoint(center, minD, maxD) {
   const r = random(minD, maxD) / 111320;
   const angle = random(TWO_PI);
-  return { lat: center.lat + r * cos(angle), lon: center.lon + (r * sin(angle)) / cos(center.lat * PI / 180) };
+  return { lat: center.lat + r * Math.cos(angle), lon: center.lon + (r * Math.sin(angle)) / Math.cos(center.lat * Math.PI / 180) };
 }
 
 function mousePressed() { if (!audioStarted) startEverything(); }
@@ -147,6 +146,7 @@ async function startEverything() {
   });
   audioStarted = true;
   document.getElementById('hotbar').style.display = 'flex';
+  document.getElementById('footer').style.display = 'flex';
 }
 
 function drawStartScreen() { 
