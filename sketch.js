@@ -22,7 +22,7 @@ function setup() {
   createCanvas(windowWidth, windowHeight);
   textFont('IBM Plex Sans');
   
-  masterReverb = new Tone.Reverb({ decay: 4, wet: 0.4 }).toDestination();
+  masterReverb = new Tone.Reverb({ decay: 5, wet: 0.3 }).toDestination();
   masterReverb.generate();
 
   ['A', 'B', 'C'].forEach(k => {
@@ -43,7 +43,7 @@ function draw() {
   background('#F8F8F4');
 
   if (!audioStarted) { drawStartScreen(); return; }
-  if (!userPos || points.length < 3) { renderStatus("Warte auf GPS..."); return; }
+  if (!userPos || points.length < 3) { renderStatus("Warte auf GPS Signal..."); return; }
 
   EntfernungA = getDistance(userPos.lat, userPos.lon, points[0].lat, points[0].lon);
   EntfernungB = getDistance(userPos.lat, userPos.lon, points[1].lat, points[1].lon);
@@ -55,15 +55,22 @@ function draw() {
     { d: EntfernungA, c: colors[0] },
     { d: EntfernungB, c: colors[1] },
     { d: EntfernungC, c: colors[2] }
-  ].sort((a, b) => b.d - a.d);
+  ].sort((a, b) => b.d - a.d); // Weiteste zuerst zeichnen
 
   noStroke();
   data.forEach(item => {
     fill(item.c);
-    // Visualisierung: 200m = kleiner Punkt, 0m = großer Punkt
-    let size = map(item.d, 200, 0, 10, width * 0.8, true);
+    // 200m Distanz = Riesiger Kreis (Füllt den Screen)
+    // 0m Distanz = Kleiner Kreis (Zentrum)
+    let size = map(item.d, 200, 0, width * 1.5, 60, true);
     ellipse(width / 2, height / 2, size);
   });
+  
+  // Optional: Debug-Text für dich zum Testen (unten links)
+  fill(0, 50);
+  textSize(12);
+  textAlign(LEFT);
+  text(`Distanzen: A:${round(EntfernungA)}m B:${round(EntfernungB)}m C:${round(EntfernungC)}m`, 20, height - 20);
 }
 
 function updateAudio() {
@@ -73,8 +80,11 @@ function updateAudio() {
 }
 
 function applyVolume(sys, d) {
-  let bgVol = map(d, 150, 0, -40, 0, true);
+  // Hintergrund fadet ab 150m ein
+  let bgVol = map(d, 150, 0, -45, 0, true);
   sys.bgGain.gain.rampTo(Tone.dbToGain(bgVol), 0.5);
+  
+  // Center fadet ab 20m ein
   let cVol = map(d, 20, 0, -60, 0, true);
   sys.centerGain.gain.rampTo(d > 20 ? 0 : Tone.dbToGain(cVol), 0.5);
 }
@@ -116,17 +126,23 @@ function mousePressed() { if (!audioStarted) startEverything(); }
 async function startEverything() {
   await Tone.start();
   ['A','B','C'].forEach(k => {
-    config[k].bg.forEach(u => new Tone.Player({ url: u, loop: true, autostart: true, fadeIn: 2 }).connect(soundSystem[k].bgGain));
+    config[k].bg.forEach(u => new Tone.Player({ url: u, loop: true, autostart: true, fadeIn: 3 }).connect(soundSystem[k].bgGain));
     new Tone.Player({ url: config[k].center, loop: true, autostart: true, fadeIn: 1 }).connect(soundSystem[k].centerGain);
   });
   audioStarted = true;
   document.getElementById('hotbar').style.display = 'flex';
 }
 
-function drawStartScreen() { fill(50); textAlign(CENTER, CENTER); textSize(16); text("unmute your phone\n& press to start", width/2, height/2); }
+function drawStartScreen() { 
+  fill(50); textAlign(CENTER, CENTER); textSize(16); 
+  text("unmute your phone\n& tap to start exploration", width/2, height/2); 
+}
+
 function renderStatus(t) { fill(50); textAlign(CENTER); text(t, width/2, height/2); }
+
 function updateUI() {
   document.getElementById('fix3').classList.toggle('active', mode === 'fix3');
   document.getElementById('var3').classList.toggle('active', mode === 'var3');
 }
+
 function windowResized() { resizeCanvas(windowWidth, windowHeight); }
