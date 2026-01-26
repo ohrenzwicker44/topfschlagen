@@ -55,7 +55,7 @@ function draw() {
     { d: EntfernungA, c: colors[0] },
     { d: EntfernungB, c: colors[1] },
     { d: EntfernungC, c: colors[2] }
-  ].sort((a, b) => b.d - a.d);
+].sort((a, b) => a.d - b.d); in)
 
   noStroke();
   data.forEach(item => {
