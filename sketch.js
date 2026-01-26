@@ -1,243 +1,453 @@
- let EntfernungA, EntfernungB, EntfernungC;
+let EntfernungA, EntfernungB, EntfernungC; 
 
-let audioStarted = false;
+ let audioStarted = false; 
 
-let mode = 'fix3';
+ let mode = 'fix3'; 
 
-let points = []; 
+ let points = [];  
 
-let userPos = null;
+ let userPos = null; 
 
-let masterReverb;
+ let masterReverb; 
 
 
-let soundSystem = {
+ let soundSystem = { 
 
-  A: { bgGain: null, centerGain: null },
+   A: { bgGain: null, centerGain: null }, 
 
-  B: { bgGain: null, centerGain: null },
+   B: { bgGain: null, centerGain: null }, 
 
-  C: { bgGain: null, centerGain: null }
+   C: { bgGain: null, centerGain: null } 
 
-};
+ }; 
 
 
-const colors = [[205, 127, 50], [30, 90, 60], [128, 0, 32]];
+ const colors = [[205, 127, 50], [30, 90, 60], [128, 0, 32]]; 
 
-const config = {
+ const config = { 
 
-  A: { bg: ["audio/a1.mp3", "audio/a2.mp3", "audio/a3.mp3"], center: "audio/a_center.mp3" },
+   A: { bg: ["audio/a1.mp3", "audio/a2.mp3", "audio/a3.mp3"], center: "audio/a_center.mp3" }, 
 
-  B: { bg: ["audio/b1.mp3", "audio/b2.mp3", "audio/b3.mp3"], center: "audio/b_center.mp3" },
+   B: { bg: ["audio/b1.mp3", "audio/b2.mp3", "audio/b3.mp3"], center: "audio/b_center.mp3" }, 
 
-  C: { bg: ["audio/c1.mp3", "audio/c2.mp3", "audio/c3.mp3"], center: "audio/c_center.mp3" }
+   C: { bg: ["audio/c1.mp3", "audio/c2.mp3", "audio/c3.mp3"], center: "audio/c_center.mp3" } 
 
-};
+ }; 
 
 
-function setup() {
+ function setup() { 
 
-  createCanvas(windowWidth, windowHeight);
+   createCanvas(windowWidth, windowHeight); 
 
-  textFont('IBM Plex Sans');
+   textFont('IBM Plex Sans'); 
 
-  
+    
 
-  masterReverb = new Tone.Reverb({ decay: 4, wet: 0.4 }).toDestination();
+   masterReverb = new Tone.Reverb({ decay: 4, wet: 0.4 }).toDestination(); 
 
-  masterReverb.generate();
+   masterReverb.generate(); 
 
 
-  ['A', 'B', 'C'].forEach(k => {
+   ['A', 'B', 'C'].forEach(k => { 
 
-    soundSystem[k].bgGain = new Tone.Gain(0).connect(masterReverb);
+     soundSystem[k].bgGain = new Tone.Gain(0).connect(masterReverb); 
 
-    soundSystem[k].centerGain = new Tone.Gain(0).connect(masterReverb);
+     soundSystem[k].centerGain = new Tone.Gain(0).connect(masterReverb); 
 
-  });
+   }); 
 
 
-  navigator.geolocation.watchPosition(pos => {
+   navigator.geolocation.watchPosition(pos => { 
 
-    userPos = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+     userPos = { lat: pos.coords.latitude, lon: pos.coords.longitude }; 
 
-    if (points.length === 0 && mode === 'fix3') setPoints();
+     if (points.length === 0 && mode === 'fix3') setPoints(); 
 
-  }, null, { enableHighAccuracy: true });
+   }, null, { enableHighAccuracy: true }); 
 
 
-  document.getElementById('fix3').onclick = () => { mode = 'fix3'; setPoints(); updateUI(); };
+   document.getElementById('fix3').onclick = () => { mode = 'fix3'; setPoints(); updateUI(); }; 
 
-  document.getElementById('var3').onclick = () => { mode = 'var3'; setPoints(); updateUI(); };
+   document.getElementById('var3').onclick = () => { mode = 'var3'; setPoints(); updateUI(); }; 
 
-}
+ } 
 
+let EntfernungA, EntfernungB, EntfernungC; 
 
-function draw() {
+ let audioStarted = false; 
 
-  background('#F8F8F4');
+ let mode = 'fix3'; 
 
+ let points = [];  
 
-  if (!audioStarted) { drawStartScreen(); return; }
+ let userPos = null; 
 
-  if (!userPos || points.length < 3) { renderStatus("Warte auf GPS..."); return; }
+ let masterReverb; 
 
 
-  EntfernungA = getDistance(userPos.lat, userPos.lon, points[0].lat, points[0].lon);
+ let soundSystem = { 
 
-  EntfernungB = getDistance(userPos.lat, userPos.lon, points[1].lat, points[1].lon);
+   A: { bgGain: null, centerGain: null }, 
 
-  EntfernungC = getDistance(userPos.lat, userPos.lon, points[2].lat, points[2].lon);
+   B: { bgGain: null, centerGain: null }, 
 
+   C: { bgGain: null, centerGain: null } 
 
-  updateAudio();
+ }; 
 
 
-  let data = [
+ const colors = [[205, 127, 50], [30, 90, 60], [128, 0, 32]]; 
 
-    { d: EntfernungA, c: colors[0] },
+ const config = { 
 
-    { d: EntfernungB, c: colors[1] },
+   A: { bg: ["audio/a1.mp3", "audio/a2.mp3", "audio/a3.mp3"], center: "audio/a_center.mp3" }, 
 
-    { d: EntfernungC, c: colors[2] }
+   B: { bg: ["audio/b1.mp3", "audio/b2.mp3", "audio/b3.mp3"], center: "audio/b_center.mp3" }, 
 
-  ].sort((a, b) => b.d - a.d);
+   C: { bg: ["audio/c1.mp3", "audio/c2.mp3", "audio/c3.mp3"], center: "audio/c_center.mp3" } 
 
+ }; 
 
-  noStroke();
 
-  data.forEach(item => {
+ function setup() { 
 
-    fill(item.c);
+   createCanvas(windowWidth, windowHeight); 
 
-    // Visualisierung: 200m = kleiner Punkt, 0m = großer Punkt
+   textFont('IBM Plex Sans'); 
 
-    let size = map(item.d, 200, 0, 10, width * 0.8, true);
+    
 
-    ellipse(width / 2, height / 2, size);
+   masterReverb = new Tone.Reverb({ decay: 4, wet: 0.4 }).toDestination(); 
 
-  });
+   masterReverb.generate(); 
 
-}
 
+   ['A', 'B', 'C'].forEach(k => { 
 
-function updateAudio() {
+     soundSystem[k].bgGain = new Tone.Gain(0).connect(masterReverb); 
 
-  applyVolume(soundSystem.A, EntfernungA);
+     soundSystem[k].centerGain = new Tone.Gain(0).connect(masterReverb); 
 
-  applyVolume(soundSystem.B, EntfernungB);
+   }); 
 
-  applyVolume(soundSystem.C, EntfernungC);
 
-}
+   navigator.geolocation.watchPosition(pos => { 
 
+     userPos = { lat: pos.coords.latitude, lon: pos.coords.longitude }; 
 
-function applyVolume(sys, d) {
+     if (points.length === 0 && mode === 'fix3') setPoints(); 
 
-  let bgVol = map(d, 150, 0, -40, 0, true);
+   }, null, { enableHighAccuracy: true }); 
 
-  sys.bgGain.gain.rampTo(Tone.dbToGain(bgVol), 0.5);
 
-  let cVol = map(d, 20, 0, -60, 0, true);
+   document.getElementById('fix3').onclick = () => { mode = 'fix3'; setPoints(); updateUI(); }; 
 
-  sys.centerGain.gain.rampTo(d > 20 ? 0 : Tone.dbToGain(cVol), 0.5);
+   document.getElementById('var3').onclick = () => { mode = 'var3'; setPoints(); updateUI(); }; 
 
-}
+ } 
 
 
-function setPoints() {
+ function draw() { 
 
-  if (mode === 'fix3') {
+   background('#F8F8F4'); 
 
-    let saved = JSON.parse(localStorage.getItem('gpsPoints'));
 
-    if (saved) points = saved;
+   if (!audioStarted) { drawStartScreen(); return; } 
 
-  } else if (userPos) {
+   if (!userPos || points.length < 3) { renderStatus("Warte auf GPS..."); return; } 
 
-    points = [];
 
-    for (let i = 0; i < 3; i++) {
+   EntfernungA = getDistance(userPos.lat, userPos.lon, points[0].lat, points[0].lon); 
 
-      let p, found = false;
+   EntfernungB = getDistance(userPos.lat, userPos.lon, points[1].lat, points[1].lon); 
 
-      while (!found) {
+   EntfernungC = getDistance(userPos.lat, userPos.lon, points[2].lat, points[2].lon); 
 
-        p = generateRandomPoint(userPos, 100, 200);
 
-        let tooClose = points.some(other => getDistance(p.lat, p.lon, other.lat, other.lon) < 100);
+   updateAudio(); 
 
-        if (!tooClose) found = true;
 
-      }
+   let data = [ 
 
-      points.push(p);
+     { d: EntfernungA, c: colors[0] }, 
 
-    }
+     { d: EntfernungB, c: colors[1] }, 
 
-  }
+     { d: EntfernungC, c: colors[2] } 
 
-}
+   ].sort((a, b) => b.d - a.d); 
 
 
-function getDistance(lat1, lon1, lat2, lon2) {
+   noStroke(); 
 
-  const R = 6371e3;
+   data.forEach(item => { 
 
-  const dLat = (lat2 - lat1) * PI / 180;
+     fill(item.c); 
 
-  const dLon = (lon2 - lon1) * PI / 180;
+     // Visualisierung: 200m = kleiner Punkt, 0m = großer Punkt 
 
-  const a = sin(dLat/2)**2 + cos(lat1*PI/180) * cos(lat2*PI/180) * sin(dLon/2)**2;
+     let size = map(item.d, 200, 0, 10, width * 0.8, true); 
 
-  return R * 2 * atan2(sqrt(a), sqrt(1-a));
+     ellipse(width / 2, height / 2, size); 
 
-}
+   }); 
 
+ } 
 
-function generateRandomPoint(center, minD, maxD) {
 
-  const r = random(minD, maxD) / 111320;
+ function updateAudio() { 
 
-  const angle = random(TWO_PI);
+   applyVolume(soundSystem.A, EntfernungA); 
 
-  return { lat: center.lat + r * cos(angle), lon: center.lon + (r * sin(angle)) / cos(center.lat * PI / 180) };
+   applyVolume(soundSystem.B, EntfernungB); 
 
-}
+   applyVolume(soundSystem.C, EntfernungC); 
 
+ } 
 
-function mousePressed() { if (!audioStarted) startEverything(); }
 
+ function applyVolume(sys, d) { 
 
-async function startEverything() {
+   let bgVol = map(d, 150, 0, -40, 0, true); 
 
-  await Tone.start();
+   sys.bgGain.gain.rampTo(Tone.dbToGain(bgVol), 0.5); 
 
-  ['A','B','C'].forEach(k => {
+   let cVol = map(d, 20, 0, -60, 0, true); 
 
-    config[k].bg.forEach(u => new Tone.Player({ url: u, loop: true, autostart: true, fadeIn: 2 }).connect(soundSystem[k].bgGain));
+   sys.centerGain.gain.rampTo(d > 20 ? 0 : Tone.dbToGain(cVol), 0.5); 
 
-    new Tone.Player({ url: config[k].center, loop: true, autostart: true, fadeIn: 1 }).connect(soundSystem[k].centerGain);
+ } 
 
-  });
 
-  audioStarted = true;
+ function setPoints() { 
 
-  document.getElementById('hotbar').style.display = 'flex';
+   if (mode === 'fix3') { 
 
-}
+     let saved = JSON.parse(localStorage.getItem('gpsPoints')); 
 
+     if (saved) points = saved; 
 
-function drawStartScreen() { fill(50); textAlign(CENTER, CENTER); textSize(16); text("unmute your phone\n& press to start", width/2, height/2); }
+   } else if (userPos) { 
 
-function renderStatus(t) { fill(50); textAlign(CENTER); text(t, width/2, height/2); }
+     points = []; 
 
-function updateUI() {
+     for (let i = 0; i < 3; i++) { 
 
-  document.getElementById('fix3').classList.toggle('active', mode === 'fix3');
+       let p, found = false; 
 
-  document.getElementById('var3').classList.toggle('active', mode === 'var3');
+       while (!found) { 
 
-}
+         p = generateRandomPoint(userPos, 100, 200); 
 
-function windowResized() { resizeCanvas(windowWidth, windowHeight); } 
+         let tooClose = points.some(other => getDistance(p.lat, p.lon, other.lat, other.lon) < 100); 
+
+         if (!tooClose) found = true; 
+
+       } 
+
+       points.push(p); 
+
+     } 
+
+   } 
+
+ } 
+
+
+ function getDistance(lat1, lon1, lat2, lon2) { 
+
+   const R = 6371e3; 
+
+   const dLat = (lat2 - lat1) * PI / 180; 
+
+   const dLon = (lon2 - lon1) * PI / 180; 
+
+   const a = sin(dLat/2)**2 + cos(lat1*PI/180) * cos(lat2*PI/180) * sin(dLon/2)**2; 
+
+   return R * 2 * atan2(sqrt(a), sqrt(1-a)); 
+
+ } 
+
+
+ function generateRandomPoint(center, minD, maxD) { 
+
+   const r = random(minD, maxD) / 111320; 
+
+   const angle = random(TWO_PI); 
+
+   return { lat: center.lat + r * cos(angle), lon: center.lon + (r * sin(angle)) / cos(center.lat * PI / 180) }; 
+
+ } 
+
+
+ function mousePressed() { if (!audioStarted) startEverything(); } 
+
+
+ async function startEverything() { 
+
+   await Tone.start(); 
+
+   ['A','B','C'].forEach(k => { 
+
+
+     config[k].bg.forEach(u => new Tone.Player({ url: u, loop: true, 
+
+autostart: true, fadeIn: 2 }).connect(soundSystem[k].bgGain)); 
+
+     new Tone.Player({ url: config[k].center, loop: true, autostart: true, fadeIn: 1 }).connect(soundSystem[k].centerGain); 
+
+   }); 
+
+   audioStarted = true; 
+
+   document.getElementById('hotbar').style.display = 'flex'; 
+
+ } 
+
+
+
+ function drawStartScreen() { fill(50); textAlign(CENTER, CENTER); 
+
+textSize(16); text("unmute your phone\n& press to start", width/2, 
+
+height/2); } 
+
+ function renderStatus(t) { fill(50); textAlign(CENTER); text(t, width/2, height/2); } 
+
+ function updateUI() { 
+
+   document.getElementById('fix3').classList.toggle('active', mode === 'fix3'); 
+
+   document.getElementById('var3').classList.toggle('active', mode === 'var3'); 
+
+ } 
+
+ function windowResized() { resizeCanvas(windowWidth, windowHeight); }  
+ function updateAudio() { 
+
+   applyVolume(soundSystem.A, EntfernungA); 
+
+   applyVolume(soundSystem.B, EntfernungB); 
+
+   applyVolume(soundSystem.C, EntfernungC); 
+
+ } 
+
+
+ function applyVolume(sys, d) { 
+
+   let bgVol = map(d, 150, 0, -40, 0, true); 
+
+   sys.bgGain.gain.rampTo(Tone.dbToGain(bgVol), 0.5); 
+
+   let cVol = map(d, 20, 0, -60, 0, true); 
+
+   sys.centerGain.gain.rampTo(d > 20 ? 0 : Tone.dbToGain(cVol), 0.5); 
+
+ } 
+
+
+ function setPoints() { 
+
+   if (mode === 'fix3') { 
+
+     let saved = JSON.parse(localStorage.getItem('gpsPoints')); 
+
+     if (saved) points = saved; 
+
+   } else if (userPos) { 
+
+     points = []; 
+
+     for (let i = 0; i < 3; i++) { 
+
+       let p, found = false; 
+
+       while (!found) { 
+
+         p = generateRandomPoint(userPos, 100, 200); 
+
+         let tooClose = points.some(other => getDistance(p.lat, p.lon, other.lat, other.lon) < 100); 
+
+         if (!tooClose) found = true; 
+
+       } 
+
+       points.push(p); 
+
+     } 
+
+   } 
+
+ } 
+
+
+ function getDistance(lat1, lon1, lat2, lon2) { 
+
+   const R = 6371e3; 
+
+   const dLat = (lat2 - lat1) * PI / 180; 
+
+   const dLon = (lon2 - lon1) * PI / 180; 
+
+   const a = sin(dLat/2)**2 + cos(lat1*PI/180) * cos(lat2*PI/180) * sin(dLon/2)**2; 
+
+   return R * 2 * atan2(sqrt(a), sqrt(1-a)); 
+
+ } 
+
+
+ function generateRandomPoint(center, minD, maxD) { 
+
+   const r = random(minD, maxD) / 111320; 
+
+   const angle = random(TWO_PI); 
+
+   return { lat: center.lat + r * cos(angle), lon: center.lon + (r * sin(angle)) / cos(center.lat * PI / 180) }; 
+
+ } 
+
+
+ function mousePressed() { if (!audioStarted) startEverything(); } 
+
+
+ async function startEverything() { 
+
+   await Tone.start(); 
+
+   ['A','B','C'].forEach(k => { 
+
+
+     config[k].bg.forEach(u => new Tone.Player({ url: u, loop: true, 
+
+autostart: true, fadeIn: 2 }).connect(soundSystem[k].bgGain)); 
+
+     new Tone.Player({ url: config[k].center, loop: true, autostart: true, fadeIn: 1 }).connect(soundSystem[k].centerGain); 
+
+   }); 
+
+   audioStarted = true; 
+
+   document.getElementById('hotbar').style.display = 'flex'; 
+
+ } 
+
+
+
+ function drawStartScreen() { fill(50); textAlign(CENTER, CENTER); 
+
+textSize(16); text("unmute your phone\n& press to start", width/2, 
+
+height/2); } 
+
+ function renderStatus(t) { fill(50); textAlign(CENTER); text(t, width/2, height/2); } 
+
+ function updateUI() { 
+
+   document.getElementById('fix3').classList.toggle('active', mode === 'fix3'); 
+
+   document.getElementById('var3').classList.toggle('active', mode === 'var3'); 
+
+ } 
+
+ function windowResized() { resizeCanvas(windowWidth, windowHeight); }  
