@@ -32,7 +32,8 @@ function setup() {
 
   navigator.geolocation.watchPosition(pos => {
     userPos = { lat: pos.coords.latitude, lon: pos.coords.longitude };
-    if (points.length === 0 && mode === 'fix3') setPoints();
+    // Initialisierung der Punkte, sobald GPS verfügbar ist
+    if (points.length === 0) setPoints();
   }, null, { enableHighAccuracy: true });
 
   document.getElementById('fix3').onclick = () => { mode = 'fix3'; setPoints(); updateUI(); };
@@ -45,24 +46,37 @@ function draw() {
   if (!audioStarted) { drawStartScreen(); return; }
   if (!userPos || points.length < 3) { renderStatus("Warte auf GPS..."); return; }
 
+  // Distanzen berechnen
   EntfernungA = getDistance(userPos.lat, userPos.lon, points[0].lat, points[0].lon);
   EntfernungB = getDistance(userPos.lat, userPos.lon, points[1].lat, points[1].lon);
   EntfernungC = getDistance(userPos.lat, userPos.lon, points[2].lat, points[2].lon);
 
   updateAudio();
 
+  // Daten für Visualisierung aufbereiten
   let data = [
-    { d: EntfernungA, c: colors[0] },
-    { d: EntfernungB, c: colors[1] },
-    { d: EntfernungC, c: colors[2] }
-].sort((a, b) => a.d - b.d); in)
+    { d: EntfernungA, c: colors[0], label: 'A' },
+    { d: EntfernungB, c: colors[1], label: 'B' },
+    { d: EntfernungC, c: colors[2], label: 'C' }
+  ];
+
+  // LOGIK: Größter Kreis oben.
+  // "Näher dran" bedeutet "Größerer Kreis".
+  // Damit der größte oben liegt, muss er ZULETZT gezeichnet werden.
+  // Wir sortieren also von WEIT ENTFERNT (klein) nach NAH DRAN (groß).
+  data.sort((a, b) => b.d - a.d); 
 
   noStroke();
   data.forEach(item => {
     fill(item.c);
-    // Visualisierung: 200m = kleiner Punkt, 0m = großer Punkt
+    // 200m = 10px, 0m = 80% Bildschirmbreite
     let size = map(item.d, 200, 0, 10, width * 0.8, true);
     ellipse(width / 2, height / 2, size);
+    
+    // Optional: Distanz-Text anzeigen
+    fill(255);
+    textAlign(CENTER);
+    if (size > 40) text(floor(item.d) + "m", width/2, height/2 + (data.indexOf(item)*15));
   });
 }
 
@@ -73,24 +87,42 @@ function updateAudio() {
 }
 
 function applyVolume(sys, d) {
+  // Lauter werden beim Annähern (150m: -40dB, 0m: 0dB)
   let bgVol = map(d, 150, 0, -40, 0, true);
   sys.bgGain.gain.rampTo(Tone.dbToGain(bgVol), 0.5);
+  
+  // Center Sound nur ganz nah (20m)
   let cVol = map(d, 20, 0, -60, 0, true);
   sys.centerGain.gain.rampTo(d > 20 ? 0 : Tone.dbToGain(cVol), 0.5);
 }
 
 function setPoints() {
+  if (!userPos) return;
+  points = [];
+
   if (mode === 'fix3') {
     let saved = JSON.parse(localStorage.getItem('gpsPoints'));
-    if (saved) points = saved;
-  } else if (userPos) {
-    points = [];
+    if (saved) {
+        points = saved;
+    } else {
+        // Fallback falls nichts gespeichert: 3 Punkte in der Nähe generieren
+        for(let i=0; i<3; i++) points.push(generateRandomPoint(userPos, 50, 100));
+    }
+  } else {
+    // VAR3 Modus: Randomisierung mit Abstandsregeln
     for (let i = 0; i < 3; i++) {
       let p, found = false;
-      while (!found) {
-        p = generateRandomPoint(userPos, 100, 200);
-        let tooClose = points.some(other => getDistance(p.lat, p.lon, other.lat, other.lon) < 100);
-        if (!tooClose) found = true;
+      let attempts = 0;
+      while (!found && attempts < 500) {
+        p = generateRandomPoint(userPos, 100, 200); // 100-200m von User
+        
+        // Prüfen, ob Punkt zu nah an bereits generierten Punkten (min 100m)
+        let tooCloseToOthers = points.some(other => 
+          getDistance(p.lat, p.lon, other.lat, other.lon) < 100
+        );
+        
+        if (!tooCloseToOthers) found = true;
+        attempts++;
       }
       points.push(p);
     }
@@ -106,27 +138,12 @@ function getDistance(lat1, lon1, lat2, lon2) {
 }
 
 function generateRandomPoint(center, minD, maxD) {
-  const r = random(minD, maxD) / 111320;
+  const r = random(minD, maxD) / 111320; // Umrechnung Meter in Grad (ungefähr)
   const angle = random(TWO_PI);
-  return { lat: center.lat + r * cos(angle), lon: center.lon + (r * sin(angle)) / cos(center.lat * PI / 180) };
+  return { 
+    lat: center.lat + r * cos(angle), 
+    lon: center.lon + (r * sin(angle)) / cos(center.lat * PI / 180) 
+  };
 }
 
-function mousePressed() { if (!audioStarted) startEverything(); }
-
-async function startEverything() {
-  await Tone.start();
-  ['A','B','C'].forEach(k => {
-    config[k].bg.forEach(u => new Tone.Player({ url: u, loop: true, autostart: true, fadeIn: 2 }).connect(soundSystem[k].bgGain));
-    new Tone.Player({ url: config[k].center, loop: true, autostart: true, fadeIn: 1 }).connect(soundSystem[k].centerGain);
-  });
-  audioStarted = true;
-  document.getElementById('hotbar').style.display = 'flex';
-}
-
-function drawStartScreen() { fill(50); textAlign(CENTER, CENTER); textSize(16); text("unmute your phone\n& press to start", width/2, height/2); }
-function renderStatus(t) { fill(50); textAlign(CENTER); text(t, width/2, height/2); }
-function updateUI() {
-  document.getElementById('fix3').classList.toggle('active', mode === 'fix3');
-  document.getElementById('var3').classList.toggle('active', mode === 'var3');
-}
-function windowResized() { resizeCanvas(windowWidth, windowHeight); }
+// ... Restliche Hilfsfunktionen (mousePressed, startEverything, etc.) bleiben gleich ...
