@@ -24,12 +24,28 @@
     
     .toggle-btn.active { background: #777; color: white; }
   </style>
+
+<style>
+  #footer {
+    position: fixed; bottom: 0; left: 0; width: 100%; height: 60px;
+    background: #E0E0E0; display: none; align-items: center; 
+    justify-content: space-around; z-index: 10;
+  }
+  .dist-val {
+    font-size: 24px; font-weight: bold; width: 33%; text-align: center;
+  }
   
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/p5.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
   <script src="sketch.js"></script>
 </head>
 <body>
+  
+  <div id="footer">
+  <div id="valA" class="dist-val">0</div>
+  <div id="valB" class="dist-val">0</div>
+  <div id="valC" class="dist-val">0</div>
+</div>
   <div id="hotbar">
     <div class="toggle-container">
       <button id="fix3" class="toggle-btn active">fix3</button>
