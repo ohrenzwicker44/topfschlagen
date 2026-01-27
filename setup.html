@@ -4,36 +4,107 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Topfschlagen Setup</title>
-    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;500&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'IBM Plex Sans', sans-serif; background: #F8F8F4; padding: 40px; text-align: center; }
-        .btn { display: block; width: 100%; padding: 20px; margin: 10px 0; border: 1px solid #777; background: white; cursor: pointer; border-radius: 4px; }
+        body { font-family: 'IBM Plex Sans', sans-serif; background: #F8F8F4; padding: 20px; text-align: center; color: #333; }
+        .container { max-width: 500px; margin: 0 auto; }
+        .btn { 
+            display: block; width: 100%; padding: 15px; margin: 10px 0 5px 0; 
+            border: 1px solid #777; background: white; cursor: pointer; border-radius: 4px; 
+            font-size: 16px; font-weight: 500;
+        }
         .btn:active { background: #E0E0E0; }
-        #status { color: #888; font-size: 14px; margin-top: 20px; }
+        .btn-ocker { border-left: 10px solid #DAA520; }
+        .btn-gruen { border-left: 10px solid #2E8B57; }
+        .btn-weinrot { border-left: 10px solid #800000; }
+        
+        .info-box { 
+            font-size: 12px; color: #666; margin-bottom: 20px; 
+            background: #eee; padding: 5px; border-radius: 4px; min-height: 18px;
+        }
+        #status { color: #007AFF; font-weight: bold; margin-bottom: 30px; font-size: 14px; }
+        h2 { margin-bottom: 10px; }
+        hr { border: 0; border-top: 1px solid #ccc; margin: 20px 0; }
     </style>
 </head>
 <body>
-    <h2>Punkt Speichern</h2>
-    <button class="btn" onclick="savePoint(0)">Punkt A (Ocker) hier speichern</button>
-    <button class="btn" onclick="savePoint(1)">Punkt B (Grün) hier speichern</button>
-    <button class="btn" onclick="savePoint(2)">Punkt C (Weinrot) hier speichern</button>
-    <div id="status">Warte auf GPS...</div>
+    <div class="container">
+        <h2>Punkt Speichern</h2>
+        <div id="status">Warte auf GPS...</div>
+
+        <div>
+            <button class="btn btn-ocker" onclick="savePoint(0)">Punkt A (Ocker) speichern</button>
+            <div id="val-0" class="info-box">Nicht gesetzt</div>
+        </div>
+
+        <div>
+            <button class="btn btn-gruen" onclick="savePoint(1)">Punkt B (Grün) speichern</button>
+            <div id="val-1" class="info-box">Nicht gesetzt</div>
+        </div>
+
+        <div>
+            <button class="btn btn-weinrot" onclick="savePoint(2)">Punkt C (Weinrot) speichern</button>
+            <div id="val-2" class="info-box">Nicht gesetzt</div>
+        </div>
+
+        <hr>
+        <button onclick="clearStorage()" style="background: none; border: none; color: red; cursor: pointer; font-size: 12px;">Speicher löschen</button>
+    </div>
 
     <script>
         let currentPos = null;
+        const labels = ["A (Ocker)", "B (Grün)", "C (Weinrot)"];
 
+        // GPS Überwachung
         navigator.geolocation.watchPosition(pos => {
-            currentPos = { lat: pos.coords.latitude, lon: pos.coords.longitude };
-            document.getElementById('status').innerText = `Aktuell: ${currentPos.lat.toFixed(6)}, ${currentPos.lon.toFixed(6)}`;
-        }, err => console.error(err), { enableHighAccuracy: true });
+            currentPos = { 
+                lat: pos.coords.latitude, 
+                lon: pos.coords.longitude,
+                alt: pos.coords.altitude ? pos.coords.altitude.toFixed(1) : '?'
+            };
+            document.getElementById('status').innerText = `📡 Signal OK: ${currentPos.lat.toFixed(6)}, ${currentPos.lon.toFixed(6)} (±${pos.coords.accuracy.toFixed(0)}m)`;
+        }, err => {
+            document.getElementById('status').innerText = "❌ GPS Fehler: " + err.message;
+        }, { enableHighAccuracy: true });
+
+        // Anzeige aktualisieren
+        function updateDisplay() {
+            let saved = JSON.parse(localStorage.getItem('gpsPoints')) || [null, null, null];
+            saved.forEach((point, i) => {
+                if (point) {
+                    document.getElementById(`val-${i}`).innerText = 
+                        `Gespeichert: ${point.lat.toFixed(6)}, ${point.lon.toFixed(6)} (${point.time})`;
+                } else {
+                    document.getElementById(`val-${i}`).innerText = "Noch kein Wert gespeichert";
+                }
+            });
+        }
 
         function savePoint(index) {
-            if (!currentPos) return alert("Noch kein GPS-Signal!");
+            if (!currentPos) return alert("Noch kein GPS-Signal! Bitte kurz warten.");
+            
             let saved = JSON.parse(localStorage.getItem('gpsPoints')) || [null, null, null];
-            saved[index] = currentPos;
+            
+            // Zeitstempel hinzufügen
+            const now = new Date();
+            const timeString = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0');
+            
+            saved[index] = { ...currentPos, time: timeString };
             localStorage.setItem('gpsPoints', JSON.stringify(saved));
-            alert(`Punkt ${index + 1} gespeichert!`);
+            
+            updateDisplay();
+            alert(`Punkt ${labels[index]} wurde aktualisiert!`);
         }
+
+        function clearStorage() {
+            if(confirm("Alle gespeicherten Punkte löschen?")) {
+                localStorage.removeItem('gpsPoints');
+                updateDisplay();
+            }
+        }
+
+        // Beim Start einmal laden
+        updateDisplay();
     </script>
 </body>
 </html>
