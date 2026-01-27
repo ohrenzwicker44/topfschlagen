@@ -145,8 +145,8 @@ function setPoints() {
     for (let i = 0; i < 3; i++) {
       let p, found = false;
       while (!found) {
-        p = generateRandomPoint(userPos, 100, 200);
-        let tooClose = points.some(other => getDistance(p.lat, p.lon, other.lat, other.lon) < 100);
+        p = generateRandomPoint(userPos, 70, 130);
+        let tooClose = points.some(other => getDistance(p.lat, p.lon, other.lat, other.lon) < 80);
         if (!tooClose) found = true;
       }
       points.push(p);
