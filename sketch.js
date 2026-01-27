@@ -60,10 +60,15 @@ function draw() {
   noStroke();
   data.forEach(item => {
     fill(item.c);
-    // Skalierung: 
-    // 0m Entfernung -> Riesiger Kreis (2x Bildschirmbreite)
-    // 200m Entfernung -> Kleiner Kreis (20px)
-    let size = map(item.d, 0, 200, width * 2, 20, true);
+   // Logik: Unter 70m wächst er extrem schnell, über 70m bleibt er klein.
+let size;
+if (item.d > 70) {
+  // Weit weg: Bleibt zwischen 20px und 100px
+  size = map(item.d, 200, 70, 20, 100, true);
+} else {
+  // Nah dran (unter 70m): Wächst massiv bis auf 2x Bildschirmbreite
+  size = map(item.d, 70, 0, 100, width * 2, true);
+}
     ellipse(width / 2, height / 2, size);
   });
 
@@ -103,10 +108,32 @@ function updateAudio() {
 }
 
 function applyVolume(sys, d) {
-  let bgVol = map(d, 150, 0, -45, 0, true);
-  sys.bgGain.gain.rampTo(Tone.dbToGain(bgVol), 0.5);
-  let cVol = map(d, 20, 0, -60, 0, true);
-  sys.centerGain.gain.rampTo(d > 20 ? 0 : Tone.dbToGain(cVol), 0.5);
+let bgVol;
+if (d > 150) {
+  bgVol = -100; // Aus
+} else if (d <= 150 && d > 70) {
+  // Sehr langsames Einblenden bis -20dB (ca. 10% Lautstärke)
+  bgVol = map(d, 150, 70, -60, -20, true);
+} else if (d <= 70 && d > 20) {
+  // Schneller Anstieg auf volle Lautstärke (0dB)
+  bgVol = map(d, 70, 20, -20, 0, true);
+} else {
+  // Im 20m Radius: Wieder etwas leiser werden (z.B. auf -6dB), 
+  // um dem Center-Sound Platz zu machen
+  bgVol = map(d, 20, 0, 0, -6, true);
+}
+sys.bgGain.gain.rampTo(Tone.dbToGain(bgVol), 0.5);
+  // 20m bis 5m: Schneller Anstieg auf ca. 70% (-4dB)
+// 5m bis 0m: Nur noch minimaler Anstieg auf 100% (0dB)
+let cVol;
+if (d > 20) {
+  cVol = -100; // Stille
+} else if (d <= 20 && d > 5) {
+  cVol = map(d, 20, 5, -60, -4, true); 
+} else {
+  cVol = map(d, 5, 0, -4, 0, true);
+}
+sys.centerGain.gain.rampTo(Tone.dbToGain(cVol), 0.5);
 }
 
 function setPoints() {
