@@ -11,7 +11,6 @@ let soundSystem = {
   C: { bgGain: null, centerGain: null }
 };
 
-// Farben wie gehabt
 const colors = [[205, 127, 50], [30, 90, 60], [128, 0, 32]];
 const config = {
   A: { bg: ["audio/a1.mp3", "audio/a2.mp3", "audio/a3.mp3"], center: "audio/a_center.mp3" },
@@ -49,8 +48,7 @@ function draw() {
 
   updateAudio();
 
-  // DATEN SORTIEREN: Kleinste Entfernung (Nah) ZUERST zeichnen
-  // Dadurch landet der größte Kreis ganz hinten.
+  // Kreise sortieren (vorne, hinten)
   let data = [
     { d: EntfernungA, c: colors[0] },
     { d: EntfernungB, c: colors[1] },
@@ -60,13 +58,12 @@ function draw() {
   noStroke();
   data.forEach(item => {
     fill(item.c);
-   // Logik: Unter 70m wächst er extrem schnell, über 70m bleibt er klein.
 let size;
 if (item.d > 70) {
-  // Weit weg: Bleibt zwischen 20px und 100px
+  // weit weg langsam größer
   size = map(item.d, 200, 70, 20, 100, true);
 } else {
-  // Nah dran (unter 70m): Wächst massiv bis auf 2x Bildschirmbreite
+  // nah dran schnell größer
   size = map(item.d, 70, 0, 100, width * 2, true);
 }
     ellipse(width / 2, height / 2, size);
@@ -75,23 +72,22 @@ if (item.d > 70) {
   updateFooter();
 }
 
+// abstandzahlen unten
 function updateFooter() {
   const elA = document.getElementById('valA');
   const elB = document.getElementById('valB');
   const elC = document.getElementById('valC');
 
-  // Ganzzahlen setzen
   elA.innerText = Math.floor(EntfernungA);
   elB.innerText = Math.floor(EntfernungB);
   elC.innerText = Math.floor(EntfernungC);
 
-  // Farben zuweisen (RGB Format für CSS)
   elA.style.color = `rgb(${colors[0][0]}, ${colors[0][1]}, ${colors[0][2]})`;
   elB.style.color = `rgb(${colors[1][0]}, ${colors[1][1]}, ${colors[1][2]})`;
   elC.style.color = `rgb(${colors[2][0]}, ${colors[2][1]}, ${colors[2][2]})`;
 }
 
-// --- GPS & AUDIO LOGIK (Unverändert zum Vorherigen) ---
+// GPS + AUDIO LOGIK
 
 function getDistance(lat1, lon1, lat2, lon2) {
   const R = 6371e3;
@@ -108,23 +104,23 @@ function updateAudio() {
 }
 
 function applyVolume(sys, d) {
+// audio grundfläche
 let bgVol;
 if (d > 150) {
   bgVol = -100; // Aus
 } else if (d <= 150 && d > 70) {
-  // Sehr langsames Einblenden bis -20dB (ca. 10% Lautstärke)
+  // weit weg - langsam lauter
   bgVol = map(d, 150, 70, -60, -20, true);
 } else if (d <= 70 && d > 20) {
-  // Schneller Anstieg auf volle Lautstärke (0dB)
+  // mittelweit weg - schneller lauter
   bgVol = map(d, 70, 20, -20, 0, true);
 } else {
-  // Im 20m Radius: Wieder etwas leiser werden (z.B. auf -6dB), 
-  // um dem Center-Sound Platz zu machen
+  // sehr nah - wieder leiser
   bgVol = map(d, 20, 0, 0, -6, true);
 }
 sys.bgGain.gain.rampTo(Tone.dbToGain(bgVol), 0.5);
-  // 20m bis 5m: Schneller Anstieg auf ca. 70% (-4dB)
-// 5m bis 0m: Nur noch minimaler Anstieg auf 100% (0dB)
+
+// audio center
 let cVol;
 if (d > 20) {
   cVol = -100; // Stille
@@ -145,8 +141,8 @@ function setPoints() {
     for (let i = 0; i < 3; i++) {
       let p, found = false;
       while (!found) {
-        p = generateRandomPoint(userPos, 70, 130);
-        let tooClose = points.some(other => getDistance(p.lat, p.lon, other.lat, other.lon) < 80);
+        p = generateRandomPoint(userPos, 50, 80);
+        let tooClose = points.some(other => getDistance(p.lat, p.lon, other.lat, other.lon) < 50);
         if (!tooClose) found = true;
       }
       points.push(p);
